@@ -73,8 +73,9 @@ with the `aports/` overlay in this repository:
 
 ## Roadmap
 
-- [ ] End-to-end pipeline validation (`build.sh` has TODO(validate) markers)
-- [ ] Speaker-audio userspace files (AudioReach topology + UCM; firmware
-      redistribution being sorted out)
+- [x] End-to-end pipeline validation (first complete image built 2026-08-08)
+- [x] Speaker-audio userspace files (`soc-fairphone-fp6-audio`: topology,
+      amp config, UCM — byte-identical to the tested dev-phone set; blob
+      provenance to be settled before this repo goes public)
 - [ ] imsd 0.3.0 tag (aport currently needs it published)
 - [ ] Nightly schedule once the first dispatched run is green

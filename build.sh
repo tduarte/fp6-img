@@ -75,6 +75,7 @@ git clone -q --depth=1 "$PMAPORTS_REPO" "$WORK/pmaports"
 rm -rf "$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos" \
        "$WORK/pmaports/main/postmarketos-config-nftables"
 cp -r aports/device/linux-postmarketos-qcom-milos "$WORK/pmaports/device/testing/"
+cp -r aports/device/soc-fairphone-fp6-audio "$WORK/pmaports/device/"
 cp -r aports/main/postmarketos-config-nftables "$WORK/pmaports/main/"
 cp -r aports/modem/imsd "$WORK/pmaports/modem/"
 
@@ -109,6 +110,7 @@ aports = $WORK/pmaports
 device = fairphone-fp6
 ui = plasma-mobile
 systemd = always
+extra_packages = soc-fairphone-fp6-audio
 EOF
 
 pmbootstrap checksum linux-postmarketos-qcom-milos
