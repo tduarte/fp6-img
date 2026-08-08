@@ -117,6 +117,12 @@ KAPORT="$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos"
 git -C "$WORK/milos-src" archive --prefix=milos-linux/ \
 	-o "$KAPORT/milos-linux-$COMMIT.tar.gz" HEAD
 sed -i "s/^_commit=.*/_commit=\"$COMMIT\"/" "$KAPORT/APKBUILD"
+# Stamp the kernel pkgver with the source commit date (7.1.2 ->
+# 7.1.2_git20260808): a rebuilt combined-stable must produce a HIGHER
+# package version, or phones subscribed to the package registry would
+# never see kernel updates.
+KDATE=$(git -C "$WORK/milos-src" log -1 --format=%cd --date=format:%Y%m%d)
+sed -i "s/^pkgver=\([0-9.]*\)\$/pkgver=\1_git$KDATE/" "$KAPORT/APKBUILD"
 
 # Same dance for imsd, pinned to a reviewed commit rather than branch tip.
 

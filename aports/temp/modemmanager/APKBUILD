@@ -29,7 +29,7 @@ makedepends="
 	gtk-doc
 	libgudev-dev
 	libmbim-dev
-	libqmi-dev
+	libqmi-dev>=1.39.1
 	linux-headers
 	meson
 	polkit-dev
