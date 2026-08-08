@@ -53,9 +53,36 @@ say "RAM-booting the new system (nothing is written)"
 fastboot boot "$BOOT"
 
 say "waiting for the phone to come up on the USB network ($PHONE)"
+# The phone side is reliable (it always configures 172.16.42.1 on its USB
+# gadget); when this step times out the problem is almost always THIS
+# machine's side of the USB link: the gadget shows up as a new network
+# interface here, and either nothing configures an address on it, or a
+# network manager grabs it with the wrong profile (we have seen
+# NetworkManager hand it an unrelated LAN address). The phone runs a DHCP
+# server on the link, but host managers don't always ask.
 i=0
 until (exec 3<>"/dev/tcp/$PHONE/22") 2>/dev/null; do
-	i=$((i+1)); [ $i -gt 40 ] && die "phone did not appear on $PHONE after 400s"
+	i=$((i+1))
+	if [ $i -gt 40 ]; then
+		cat >&2 <<'EOF'
+ERROR: phone did not appear on 172.16.42.1 after 400s.
+
+The phone has most likely booted fine - this machine just hasn't configured
+its side of the USB network link. Fix it by hand:
+
+  1. find the new interface:   ip link   (usually enp*u* or usb0, appeared
+     when the phone booted; unplug/replug USB and watch if unsure)
+  2. give this machine an address on it:
+        sudo ip link set <iface> up
+        sudo ip addr add 172.16.42.2/24 dev <iface>
+  3. verify:                   ping 172.16.42.1
+  4. re-run this script - every step is safe to repeat.
+
+If a network manager keeps reclaiming the interface, tell it to ignore it,
+e.g.: sudo nmcli device set <iface> managed no
+EOF
+		exit 1
+	fi
 	sleep 10
 done
 exec 3<&- 3>&- 2>/dev/null || true
