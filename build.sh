@@ -41,17 +41,14 @@ if [ "$(id -u)" = 0 ]; then
 	mkdir -p /usr/local/sbin
 	printf '#!/bin/sh\nexit 0\n' > /usr/local/sbin/modprobe
 	chmod +x /usr/local/sbin/modprobe
-	# A privileged container's /dev is a snapshot from container start —
-	# loop/dm nodes the host creates later never appear. Create the static
-	# nodes here; opening them autoloads the drivers host-side (reserved
-	# major/minors: loop = block 7,N; device-mapper control = char 10,236).
-	i=0
-	while [ $i -le 15 ]; do
-		[ -b /dev/loop$i ] || mknod -m 660 /dev/loop$i b 7 $i
-		i=$((i + 1))
-	done
-	mkdir -p /dev/mapper
-	[ -c /dev/mapper/control ] || mknod -m 600 /dev/mapper/control c 10 236
+	# The container must run with the host's /dev bind-mounted
+	# (--volume /dev:/dev): partition nodes (loopNpM) appear via devtmpfs
+	# only there — a privileged container's own /dev is a stale snapshot
+	# from container start and never gains them.
+	if ! grep -q ' /dev devtmpfs ' /proc/mounts; then
+		echo "WARNING: /dev is not the host devtmpfs (run the container" \
+		     "with --volume /dev:/dev) - partition nodes will not appear" >&2
+	fi
 	id build >/dev/null 2>&1 || adduser -D build
 	echo 'build ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/build
 	rm -rf dist
