@@ -28,6 +28,13 @@ if [ "$(id -u)" = 0 ]; then
 	apk add -q git sudo openssl python3 py3-pip multipath-tools util-linux
 	pip install -q --break-system-packages \
 		git+https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git@3.11.1
+	# The container cannot modprobe (no /lib/modules in here), but it doesn't
+	# need to: the host kernel autoloads the loop driver when losetup opens
+	# the static /dev/loop-control node. Make pmbootstrap's explicit
+	# 'sudo modprobe loop' a no-op (/usr/local/sbin precedes /sbin in sudo's
+	# secure_path).
+	printf '#!/bin/sh\nexit 0\n' > /usr/local/sbin/modprobe
+	chmod +x /usr/local/sbin/modprobe
 	id build >/dev/null 2>&1 || adduser -D build
 	echo 'build ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/build
 	rm -rf dist
