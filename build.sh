@@ -185,6 +185,7 @@ cp -L "$EXPORT/fairphone-fp6.img" dist/fairphone-fp6.img
 	echo "imsd:          $IMSD_REPO @ $IMSD_COMMIT (0.3.0)"
 } > dist/build-info.txt
 cp README.md dist/README.md
+cp install.sh dist/install.sh
 
 (cd dist && sha256sum -- * > sha256sums.txt)
 ls -la dist/
