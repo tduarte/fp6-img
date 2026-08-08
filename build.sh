@@ -21,7 +21,11 @@ cd "$(dirname "$0")"
 # The checkout stays root-owned (later workflow steps need its .git); the
 # build user only gets dist/.
 if [ "$(id -u)" = 0 ]; then
-	apk add -q pmbootstrap git sudo
+	# pmbootstrap pinned from git: Alpine's package is older and e.g. still
+	# reads channels.cfg from origin/master (upstream pmaports moved to main).
+	apk add -q git sudo openssl python3 py3-pip
+	pip install -q --break-system-packages \
+		git+https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git@3.11.1
 	id build >/dev/null 2>&1 || adduser -D build
 	echo 'build ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/build
 	rm -rf dist
