@@ -77,12 +77,19 @@ fi' EXIT
 rm -rf "$WORK/pmaports"
 git clone -q --depth=1 "$PMAPORTS_REPO" "$WORK/pmaports"
 rm -rf "$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos" \
-       "$WORK/pmaports/main/postmarketos-config-nftables"
+       "$WORK/pmaports/main/postmarketos-config-nftables" \
+       "$WORK/pmaports/temp/libqmi" \
+       "$WORK/pmaports/temp/modemmanager"
+mkdir -p "$WORK/pmaports/temp"
 cp -r aports/device/linux-postmarketos-qcom-milos "$WORK/pmaports/device/testing/"
 cp -r aports/device/soc-fairphone-fp6-audio "$WORK/pmaports/device/"
 cp -r aports/device/callaudioshim "$WORK/pmaports/device/"
 cp -r aports/main/postmarketos-config-nftables "$WORK/pmaports/main/"
 cp -r aports/modem/imsd "$WORK/pmaports/modem/"
+# Alpine forks carrying the GNSS patches (libqmi !470 unreleased; MM !1463
+# draft) - deps of modemmanager/imsd, built from aports because r100 > repo.
+cp -r aports/temp/libqmi "$WORK/pmaports/temp/"
+cp -r aports/temp/modemmanager "$WORK/pmaports/temp/"
 
 # --- 2. pin the kernel source -------------------------------------------------
 # Source archives are disabled on the Forgejo instance, so generate the
@@ -126,6 +133,8 @@ EOF
 
 pmbootstrap checksum linux-postmarketos-qcom-milos
 pmbootstrap checksum imsd
+pmbootstrap checksum libqmi
+pmbootstrap checksum modemmanager
 
 # --- 4. build the image -------------------------------------------------------
 # Same default credentials as the official postmarketOS images.

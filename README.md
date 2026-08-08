@@ -13,9 +13,7 @@ Maintained by [Jorijn van der Graaf](https://catcrafts.net/about)
 > [!CAUTION]
 > **Emergency calling is unverified.** Calls (including 112/911) go through
 > imsd, whose emergency path is spec-shaped but has never been verified
-> against a live network. There is also a known kernel bug that can wedge the
-> modem data path until reboot. **Do not rely on a phone running this image
-> to make emergency calls.**
+> against a live network.
 
 ## What works
 
@@ -35,6 +33,7 @@ then:
 ```sh
 fastboot flash userdata fairphone-fp6.img
 fastboot flash boot boot.img
+fastboot erase dtbo
 fastboot reboot
 ```
 
