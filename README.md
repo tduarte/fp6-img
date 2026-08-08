@@ -26,9 +26,27 @@ carriers are very welcome.
 
 ## Flashing
 
-Download `boot.img` and `fairphone-fp6.img` from the latest release, unlock
-the bootloader ([Fairphone's official process](https://support.fairphone.com/hc/en-us/articles/10492476238737)),
-then:
+Download `boot.img` and `fairphone-fp6.img` from the latest release and unlock
+the bootloader ([Fairphone's official process](https://support.fairphone.com/hc/en-us/articles/10492476238737)).
+
+**Recommended — modem-preserving install** (`fastboot boot` streams the
+kernel to RAM without writing; all writes then happen from Linux, which the
+bootloader's boot-flash NV-wipe never sees — see the warning below):
+
+```sh
+fastboot boot boot.img
+# wait ~60s; the phone comes up on the USB network as 172.16.42.1
+# (fresh devices land in the initramfs debug shell; telnet 172.16.42.1)
+# then write both images through Linux, e.g. over the USB network:
+ssh user@172.16.42.1   # or the debug shell on virgin devices
+# on the phone: fetch/receive the images and
+#   dd of=/dev/disk/by-partlabel/boot_a   for boot.img
+#   dd of=/dev/disk/by-partlabel/userdata for fairphone-fp6.img
+fastboot erase dtbo   # one-time, on the next fastboot visit (safe: verified)
+```
+
+**Classic install** (simpler, but `fastboot flash boot` **zeroes the modem's
+NV** — cellular will be dead until you restore your `modemst` backup):
 
 ```sh
 fastboot flash userdata fairphone-fp6.img
