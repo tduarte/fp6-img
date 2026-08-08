@@ -22,6 +22,10 @@ jobs:
     runs-on: pmos
     timeout-minutes: 420
     steps:
+      # actions/checkout & friends are Node actions; bare alpine has no node
+      - name: Provision job container
+        run: apk add -q nodejs git
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
