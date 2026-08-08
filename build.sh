@@ -23,7 +23,9 @@ cd "$(dirname "$0")"
 if [ "$(id -u)" = 0 ]; then
 	# pmbootstrap pinned from git: Alpine's package is older and e.g. still
 	# reads channels.cfg from origin/master (upstream pmaports moved to main).
-	apk add -q git sudo openssl python3 py3-pip
+	# multipath-tools: kpartx; util-linux: losetup with --json support
+	# (pmbootstrap's host-tool checks + image mounting need both)
+	apk add -q git sudo openssl python3 py3-pip multipath-tools util-linux
 	pip install -q --break-system-packages \
 		git+https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git@3.11.1
 	id build >/dev/null 2>&1 || adduser -D build
