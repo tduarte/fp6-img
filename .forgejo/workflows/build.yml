@@ -1,0 +1,55 @@
+name: image
+
+# Builds a flashable postmarketOS image for the Fairphone 6 (kernel from
+# milos-linux combined-stable + imsd) and publishes it as the rolling
+# 'latest' release.
+#
+# Runs on the dedicated privileged runner label "pmos" (loop devices for
+# pmbootstrap install, qemu-user binfmt on the host for the aarch64 chroots).
+# Until that runner is registered, dispatched runs will sit queued.
+
+on:
+  workflow_dispatch:
+  # Enable after the pipeline is validated end-to-end:
+  # schedule:
+  #   - cron: '30 3 * * *'
+
+jobs:
+  image:
+    runs-on: pmos
+    timeout-minutes: 420
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Build image
+        run: ./build.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: fp6-image-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Update rolling 'latest' tag
+        run: |
+          git config user.email "ci@catcrafts.net"
+          git config user.name "fp6-img CI"
+          git tag -f latest
+          git push origin latest --force
+
+      - name: Publish rolling 'latest' release
+        uses: https://code.forgejo.org/actions/forgejo-release@v2
+        with:
+          direction: upload
+          url: ${{ github.server_url }}
+          repo: ${{ github.repository }}
+          tag: latest
+          title: Latest FP6 postmarketOS image (EMERGENCY CALLING UNVERIFIED)
+          prerelease: true
+          override: true
+          release-dir: dist
+          token: ${{ secrets.GITHUB_TOKEN }}

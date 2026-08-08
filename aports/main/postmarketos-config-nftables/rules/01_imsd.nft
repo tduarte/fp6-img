@@ -1,0 +1,15 @@
+#!/usr/sbin/nft -f
+
+table inet filter {
+	chain input {
+
+		# imsd's IPsec-protected SIP ports on the IMS PDN. Ordered before
+		# 01_wwan.nft's qmapmux drop: the ESP-decapsulated inbound flows
+		# arrive on qmapmux* and would be dropped there. The comment is
+		# load-bearing — imsd's ims-pdn-up.sh checks for it and skips its
+		# runtime rule insertion when this rule is present.
+		iifname "qmapmux*" tcp dport 45061-45062 accept comment "imsd-protected-ports"
+		iifname "qmapmux*" udp dport 45061-45062 accept comment "imsd-protected-ports"
+
+	}
+}
