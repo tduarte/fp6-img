@@ -55,10 +55,26 @@ if [ "$(id -u)" = 0 ]; then
 	fi
 	id build >/dev/null 2>&1 || adduser -D build
 	echo 'build ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/build
-	rm -rf dist
+	# empty dist in place (never delete the dir itself: a shell cd'd into it
+	# would poison the next podman invocation's cwd)
 	install -d -o build dist
+	find dist -mindepth 1 -delete
 	exec su build -c "sh -eu '$PWD/build.sh'"
 fi
+
+# git hosts occasionally hiccup (our forgejo lives on a small VM that also
+# serves crawlers); a clone failure should cost a retry, not the whole run
+clone_retry() { # clone_retry <dest> <git clone args...>
+	_dest=$1; shift
+	for _i in 1 2 3; do
+		rm -rf "$_dest"
+		git clone "$@" "$_dest" && return 0
+		echo "git clone $_dest failed (attempt $_i/3), retrying in 10s..." >&2
+		sleep 10
+	done
+	echo "git clone $_dest failed after 3 attempts" >&2
+	return 1
+}
 
 WORK=${FP6IMG_WORK:-$HOME/fp6img-work}
 mkdir -p "$WORK"
@@ -74,8 +90,8 @@ fi' EXIT
 # --- 1. pmaports with our aports copied over ---------------------------------
 # pmbootstrap hard-errors when a pkgname exists in more than one aports dir,
 # so "overlay" means: clone upstream, delete the upstream aport, drop ours in.
-rm -rf "$WORK/pmaports"
-git clone -q --depth=1 "$PMAPORTS_REPO" "$WORK/pmaports"
+
+clone_retry "$WORK/pmaports" -q --depth=1 "$PMAPORTS_REPO"
 rm -rf "$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos" \
        "$WORK/pmaports/main/postmarketos-config-nftables" \
        "$WORK/pmaports/temp/libqmi" \
@@ -94,8 +110,8 @@ cp -r aports/temp/modemmanager "$WORK/pmaports/temp/"
 # --- 2. pin the kernel source -------------------------------------------------
 # Source archives are disabled on the Forgejo instance, so generate the
 # tarball ourselves; abuild treats it as a local source file.
-rm -rf "$WORK/milos-src"
-git clone -q --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_REPO" "$WORK/milos-src"
+
+clone_retry "$WORK/milos-src" -q --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_REPO"
 COMMIT=$(git -C "$WORK/milos-src" rev-parse HEAD)
 KAPORT="$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos"
 git -C "$WORK/milos-src" archive --prefix=milos-linux/ \
@@ -103,8 +119,8 @@ git -C "$WORK/milos-src" archive --prefix=milos-linux/ \
 sed -i "s/^_commit=.*/_commit=\"$COMMIT\"/" "$KAPORT/APKBUILD"
 
 # Same dance for imsd, pinned to a reviewed commit rather than branch tip.
-rm -rf "$WORK/imsd-src"
-git clone -q "$IMSD_REPO" "$WORK/imsd-src"
+
+clone_retry "$WORK/imsd-src" -q "$IMSD_REPO"
 git -C "$WORK/imsd-src" checkout -q "$IMSD_COMMIT"
 IAPORT="$WORK/pmaports/modem/imsd"
 git -C "$WORK/imsd-src" archive --prefix=imsd/ \
