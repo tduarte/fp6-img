@@ -22,9 +22,10 @@ jobs:
     runs-on: pmos
     timeout-minutes: 420
     steps:
-      # actions/checkout & friends are Node actions; bare alpine has no node
+      # actions/checkout & friends are Node actions; bare alpine has no node.
+      # bash: required by the forgejo-release composite action.
       - name: Provision job container
-        run: apk add -q nodejs git
+        run: apk add -q nodejs git bash
 
       - name: Checkout
         uses: actions/checkout@v4
