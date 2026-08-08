@@ -37,8 +37,11 @@ makedepends="
 	"
 checkdepends="glib-dev py3-gobject3 py3-dbus"
 # fp6-img: crossdirect breaks on this build (native cc cannot spawn cc1 from
-# the foreign chroot); build under plain qemu instead.
-options="!pmb:crossdirect"
+# the foreign chroot); build under plain qemu instead. !check because 3 of
+# 38 glib tests SIGABRT under qemu-user emulation (they pass on Alpine's
+# native builders, and none exercise the GNSS code our patches change) -
+# on-device validation is the real test.
+options="!pmb:crossdirect !check"
 subpackages="
 	$pkgname-lang
 	$pkgname-doc
