@@ -33,6 +33,7 @@ if [ "$(id -u)" = 0 ]; then
 	# the static /dev/loop-control node. Make pmbootstrap's explicit
 	# 'sudo modprobe loop' a no-op (/usr/local/sbin precedes /sbin in sudo's
 	# secure_path).
+	mkdir -p /usr/local/sbin
 	printf '#!/bin/sh\nexit 0\n' > /usr/local/sbin/modprobe
 	chmod +x /usr/local/sbin/modprobe
 	id build >/dev/null 2>&1 || adduser -D build
