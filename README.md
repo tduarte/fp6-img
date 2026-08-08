@@ -40,6 +40,17 @@ fastboot reboot
 Default login: `user` / `147147` (same as official postmarketOS images —
 change it). **Never re-lock the bootloader** with a custom image installed.
 
+> [!WARNING]
+> **Back up your modem's NV partitions before flashing.** Flash sessions have
+> been observed to zero `modemst1`/`modemst2` on this device, after which the
+> modem reports no IMEI and neither SIM slot answers (`no-atr-received`) —
+> including the eSIM. The profiles themselves are safe in the eUICC, but only
+> a restore of working `modemst` images brings access back; stock Android
+> re-provisions them on boot, postmarketOS cannot. Before your first flash:
+> `dd` both partitions to files from a rooted stock system (or from a running
+> pmOS: `/dev/disk/by-partlabel/modemst1` and `modemst2`) and keep them
+> forever. Restore with `dd` in the other direction, then reboot.
+
 ## VoLTE configuration
 
 imsd is installed but needs your carrier's P-CSCF address:
