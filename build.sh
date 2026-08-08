@@ -1,61 +1,84 @@
 #!/bin/sh -eu
 # fp6-img pipeline: build a flashable postmarketOS image for the Fairphone 6
-# with the Catcrafts kernel (milos-linux combined-stable) and imsd (VoLTE).
+# with the Catcrafts kernel (milos-linux combined-stable) and, once its tag
+# is published, imsd (VoLTE).
 #
-# Runs in CI inside an Alpine container on a privileged runner (pmbootstrap
-# needs loop devices; the aarch64 chroots need qemu-user binfmt on the host).
-# Also runnable locally in any Alpine environment with the same privileges.
-#
-# Status: SCAFFOLD — steps marked TODO(validate) have not run end-to-end yet.
+# Runs in CI inside an Alpine container on the privileged "pmos" runner
+# (pmbootstrap needs loop devices; the aarch64 chroots need the qemu-user
+# binfmt registered on the host). Also runnable in any Alpine environment
+# with the same privileges.
 
 KERNEL_REPO=https://forgejo.catcrafts.net/Catcrafts/milos-linux.git
 KERNEL_BRANCH=combined-stable
-KERNEL_APORT=aports/device/linux-postmarketos-qcom-milos
+PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
 cd "$(dirname "$0")"
 
-apk add -q pmbootstrap git zstd
+# pmbootstrap refuses to run as root: install deps, then re-exec as a build
+# user with passwordless sudo (pmbootstrap escalates itself where needed).
+if [ "$(id -u)" = 0 ]; then
+	apk add -q pmbootstrap git sudo
+	id build >/dev/null 2>&1 || adduser -D build
+	echo 'build ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/build
+	chown -R build "$PWD"
+	exec su build -c "sh '$PWD/build.sh'"
+fi
 
-# --- 1. Pin the kernel source ------------------------------------------------
+WORK=${FP6IMG_WORK:-$HOME/fp6img-work}
+mkdir -p "$WORK"
+
+# --- 1. pmaports with our aports copied over ---------------------------------
+# pmbootstrap hard-errors when a pkgname exists in more than one aports dir,
+# so "overlay" means: clone upstream, delete the upstream aport, drop ours in.
+rm -rf "$WORK/pmaports"
+git clone -q --depth=1 "$PMAPORTS_REPO" "$WORK/pmaports"
+rm -rf "$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos" \
+       "$WORK/pmaports/main/postmarketos-config-nftables"
+cp -r aports/device/linux-postmarketos-qcom-milos "$WORK/pmaports/device/testing/"
+cp -r aports/main/postmarketos-config-nftables "$WORK/pmaports/main/"
+cp -r aports/modem/imsd "$WORK/pmaports/modem/"
+
+# --- 2. pin the kernel source -------------------------------------------------
 # Source archives are disabled on the Forgejo instance, so generate the
-# tarball ourselves and let abuild treat it as a local source file.
-rm -rf /tmp/milos-src "$KERNEL_APORT"/milos-linux-*.tar.gz
-git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_REPO" /tmp/milos-src
-COMMIT=$(git -C /tmp/milos-src rev-parse HEAD)
-git -C /tmp/milos-src archive --prefix=milos-linux/ \
-    -o "$PWD/$KERNEL_APORT/milos-linux-$COMMIT.tar.gz" HEAD
-sed -i "s/^_commit=.*/_commit=\"$COMMIT\"/" "$KERNEL_APORT/APKBUILD"
+# tarball ourselves; abuild treats it as a local source file.
+rm -rf "$WORK/milos-src"
+git clone -q --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_REPO" "$WORK/milos-src"
+COMMIT=$(git -C "$WORK/milos-src" rev-parse HEAD)
+KAPORT="$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos"
+git -C "$WORK/milos-src" archive --prefix=milos-linux/ \
+	-o "$KAPORT/milos-linux-$COMMIT.tar.gz" HEAD
+sed -i "s/^_commit=.*/_commit=\"$COMMIT\"/" "$KAPORT/APKBUILD"
 
-# --- 2. Configure pmbootstrap ------------------------------------------------
-# TODO(validate): exact non-interactive init + overlay ordering (our aports
-# dir must shadow the upstream pmaports aports of the same name).
+# --- 3. configure pmbootstrap -------------------------------------------------
+pmbootstrap config aports "$WORK/pmaports"
 pmbootstrap config device fairphone-fp6
 pmbootstrap config ui plasma-mobile
 pmbootstrap config systemd always
-pmbootstrap config extra_packages imsd,postmarketos-config-nftables-imsd
-# TODO(validate): point pmbootstrap at "$PWD/aports" as an overlay.
+# Stage 1 builds WITHOUT imsd: its aport sources the v0.3.0 tag, which is not
+# published yet. When it is: uncomment here and in the checksum step below.
+#pmbootstrap config extra_packages imsd
 
 pmbootstrap checksum linux-postmarketos-qcom-milos
-pmbootstrap checksum imsd
+#pmbootstrap checksum imsd
 
-# --- 3. Build the image ------------------------------------------------------
+# --- 4. build the image -------------------------------------------------------
 # Same default credentials as the official postmarketOS images.
-pmbootstrap -y zap || true
+pmbootstrap -y zap >/dev/null 2>&1 || true
 pmbootstrap install --password 147147
 
-# --- 4. Collect artifacts ----------------------------------------------------
-# TODO(validate): exact export paths (boot.img + rootfs) for the fastboot
-# flash method on fairphone-fp6.
-rm -rf /tmp/pmos-export dist
-mkdir -p /tmp/pmos-export dist
-pmbootstrap export /tmp/pmos-export
-cp -L /tmp/pmos-export/boot.img dist/fp6-boot.img
-cp -L /tmp/pmos-export/*.img dist/ 2>/dev/null || true
+# --- 5. collect artifacts -----------------------------------------------------
+EXPORT=/tmp/postmarketOS-export
+rm -rf "$EXPORT" dist
+mkdir -p dist
+pmbootstrap export "$EXPORT"
+cp -L "$EXPORT/boot.img" dist/boot.img
+cp -L "$EXPORT/fairphone-fp6.img" dist/fairphone-fp6.img
 
 {
-    echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
-    echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "default login: user / 147147 (same as official postmarketOS images)"
+	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
+	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	echo "default login: user / 147147 (same as official postmarketOS images)"
+	echo "imsd:          not included yet (waiting on the v0.3.0 tag)"
 } > dist/build-info.txt
 cp README.md dist/README.md
 

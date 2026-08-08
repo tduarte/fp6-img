@@ -28,13 +28,13 @@ carriers are very welcome.
 
 ## Flashing
 
-Download `fp6-boot.img` and the rootfs image from the latest release, unlock
+Download `boot.img` and `fairphone-fp6.img` from the latest release, unlock
 the bootloader ([Fairphone's official process](https://support.fairphone.com/hc/en-us/articles/10492476238737)),
 then:
 
 ```sh
 fastboot flash userdata fairphone-fp6.img
-fastboot flash boot fp6-boot.img
+fastboot flash boot boot.img
 fastboot reboot
 ```
 

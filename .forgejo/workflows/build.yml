@@ -10,7 +10,10 @@ name: image
 
 on:
   workflow_dispatch:
-  # Enable after the pipeline is validated end-to-end:
+  # push trigger is temporary, for pipeline bring-up; narrow to
+  # workflow_dispatch + a nightly schedule once the pipeline is green:
+  push:
+    branches: [main]
   # schedule:
   #   - cron: '30 3 * * *'
 
