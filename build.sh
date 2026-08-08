@@ -158,6 +158,13 @@ pmbootstrap checksum imsd
 pmbootstrap checksum libqmi
 pmbootstrap checksum modemmanager
 
+# pmbootstrap's install-time build plan is not dependency-ordered (it tried
+# building modemmanager before the libqmi its makedepends require); build
+# the GNSS stack bottom-up explicitly. 'pmbootstrap build' is a no-op when
+# the package is already current.
+pmbootstrap build --arch aarch64 libqmi
+pmbootstrap build --arch aarch64 modemmanager
+
 # --- 4. build the image -------------------------------------------------------
 # Same default credentials as the official postmarketOS images.
 pmbootstrap -y zap >/dev/null 2>&1 || true
