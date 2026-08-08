@@ -8,6 +8,8 @@
 # binfmt registered on the host). Also runnable in any Alpine environment
 # with the same privileges.
 
+set -eu
+
 KERNEL_REPO=https://forgejo.catcrafts.net/Catcrafts/milos-linux.git
 KERNEL_BRANCH=combined-stable
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
@@ -16,12 +18,15 @@ cd "$(dirname "$0")"
 
 # pmbootstrap refuses to run as root: install deps, then re-exec as a build
 # user with passwordless sudo (pmbootstrap escalates itself where needed).
+# The checkout stays root-owned (later workflow steps need its .git); the
+# build user only gets dist/.
 if [ "$(id -u)" = 0 ]; then
 	apk add -q pmbootstrap git sudo
 	id build >/dev/null 2>&1 || adduser -D build
 	echo 'build ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/build
-	chown -R build "$PWD"
-	exec su build -c "sh '$PWD/build.sh'"
+	rm -rf dist
+	install -d -o build dist
+	exec su build -c "sh -eu '$PWD/build.sh'"
 fi
 
 WORK=${FP6IMG_WORK:-$HOME/fp6img-work}
@@ -50,13 +55,20 @@ git -C "$WORK/milos-src" archive --prefix=milos-linux/ \
 sed -i "s/^_commit=.*/_commit=\"$COMMIT\"/" "$KAPORT/APKBUILD"
 
 # --- 3. configure pmbootstrap -------------------------------------------------
-pmbootstrap config aports "$WORK/pmaports"
-pmbootstrap config device fairphone-fp6
-pmbootstrap config ui plasma-mobile
-pmbootstrap config systemd always
+# 'pmbootstrap config' refuses to run before a config exists ("run init
+# first"), so write the config file directly (INI, [pmbootstrap] section,
+# keys = pmb.core.Config attributes).
 # Stage 1 builds WITHOUT imsd: its aport sources the v0.3.0 tag, which is not
-# published yet. When it is: uncomment here and in the checksum step below.
-#pmbootstrap config extra_packages imsd
+# published yet. When it is: add "extra_packages = imsd" and enable the
+# checksum line below.
+mkdir -p "$HOME/.config"
+cat > "$HOME/.config/pmbootstrap_v3.cfg" <<EOF
+[pmbootstrap]
+aports = $WORK/pmaports
+device = fairphone-fp6
+ui = plasma-mobile
+systemd = always
+EOF
 
 pmbootstrap checksum linux-postmarketos-qcom-milos
 #pmbootstrap checksum imsd
@@ -68,8 +80,7 @@ pmbootstrap install --password 147147
 
 # --- 5. collect artifacts -----------------------------------------------------
 EXPORT=/tmp/postmarketOS-export
-rm -rf "$EXPORT" dist
-mkdir -p dist
+rm -rf "$EXPORT"
 pmbootstrap export "$EXPORT"
 cp -L "$EXPORT/boot.img" dist/boot.img
 cp -L "$EXPORT/fairphone-fp6.img" dist/fairphone-fp6.img

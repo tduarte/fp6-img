@@ -43,6 +43,7 @@ jobs:
 
       - name: Update rolling 'latest' tag
         run: |
+          git config --global --add safe.directory "$PWD"
           git config user.email "ci@catcrafts.net"
           git config user.name "fp6-img CI"
           git tag -f latest
