@@ -1,0 +1,21 @@
+# The FP6's wifi and BT share the WCN combo chip; systemd idle-suspend (and
+# BT-off) resets the shared firmware and kills wifi for ~40 minutes. Mask
+# the sleep targets declaratively - shipped as /dev/null symlinks, the same
+# state 'systemctl mask' produces.
+maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
+pkgname=fp6-no-suspend
+pkgver=1
+pkgrel=0
+pkgdesc="Mask systemd sleep targets (suspend kills wifi on the FP6)"
+url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
+arch="noarch"
+license="MIT"
+options="!check"
+
+package() {
+	for t in sleep suspend hibernate hybrid-sleep; do
+		mkdir -p "$pkgdir/etc/systemd/system"
+		ln -s /dev/null "$pkgdir/etc/systemd/system/$t.target"
+	done
+}
+sha512sums=""

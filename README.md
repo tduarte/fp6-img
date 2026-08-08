@@ -50,7 +50,8 @@ PCSCF=<your carrier's P-CSCF IPv6 address>
 ```
 
 Find it in a stock-firmware capture or your carrier's IMS documentation, then
-`systemctl restart imsd`. See the
+`systemctl restart imsd` (the service is enabled at boot and waits for this
+file to exist). See the
 [imsd README](https://forgejo.catcrafts.net/Catcrafts/imsd) for the full
 variable reference and carrier assumptions.
 
