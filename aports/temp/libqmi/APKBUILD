@@ -1,11 +1,12 @@
-# fp6-img fork of Alpine community/libqmi: + the upstream-merged (!470,
-# unreleased) LOC Register Events client-identification TLVs - half of
-# working GNSS on the FP6. Drop when Alpine ships libqmi > 1.39.0.
+# fp6-img fork of Alpine community/libqmi: snapshot bumped to upstream main
+# just past the !470 merge (LOC Register Events client-identification TLVs,
+# half of working GNSS on the FP6) - which also provides the qmi-glib 1.39.1
+# our modemmanager patches require. Drop when Alpine's snapshot catches up.
 # Contributor: Stuart Cardall <developer@it-offshore.co.uk>
 maintainer="Achill Gilgenast <achill@achill.org>"
 pkgname=libqmi
-pkgver=1.38.0_git20260414
-_commit=cff17a676e10d75081516dafa997fe9bc9043c38
+pkgver=1.39.1_git20260808
+_commit=30f3e998e6cbda364ac1bc73223de20561e6d555
 pkgrel=100
 pkgdesc="QMI modem protocol helper library"
 url="https://www.freedesktop.org/wiki/Software/libqmi"
@@ -31,7 +32,6 @@ subpackages="
 	"
 #source="https://gitlab.freedesktop.org/mobile-broadband/libqmi/-/archive/$pkgver/libqmi-$pkgver.tar.gz"
 source="https://gitlab.freedesktop.org/mobile-broadband/libqmi/-/archive/$_commit/libqmi-$_commit.tar.gz
-	0001-loc-add-client-identification-TLVs-to-Register-Event.patch
 	"
 builddir="$srcdir/$pkgname-$_commit"
 
