@@ -22,7 +22,16 @@ provides="81voltd=$pkgver-r$pkgrel"
 # no OpenRC service yet: the unit's PDN-bring-up/env-file sequencing is only
 # tested under systemd; an initd is welcome once someone can verify one
 subpackages="$pkgname-systemd"
-source="$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz"
+# Pinned by CI (see build.sh at the repository root): the Forgejo instance
+# serves no source archives, so the tarball is generated with git-archive
+# (prefix imsd/) and placed next to this APKBUILD. The skel override hides
+# kde-telephony's modem daemon autostart for the account created at install —
+# imsd-dialerd owns those session D-Bus names instead.
+_commit="REPLACED_BY_CI"
+source="
+	imsd-$_commit.tar.gz
+	org.kde.modem.daemon.desktop
+"
 builddir="$srcdir/$pkgname"
 
 build() {
@@ -35,6 +44,8 @@ check() {
 
 package() {
 	make install DESTDIR="$pkgdir"
+	install -Dm644 "$srcdir"/org.kde.modem.daemon.desktop \
+		"$pkgdir"/etc/skel/.config/autostart/org.kde.modem.daemon.desktop
 }
 
 systemd() {
@@ -44,5 +55,6 @@ systemd() {
 }
 
 sha512sums="
-PLACEHOLDER_RUN_PMBOOTSTRAP_CHECKSUM_AFTER_V0_3_0_TAG_EXISTS  imsd-0.3.0.tar.gz
+REPLACED_BY_CI  imsd-REPLACED_BY_CI.tar.gz
+REPLACED_BY_CI  org.kde.modem.daemon.desktop
 "

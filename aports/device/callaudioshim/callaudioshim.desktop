@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=CallAudio Shim
+Comment=callaudiod replacement: working mic mute for calls (org.mobian_project.CallAudio)
+Exec=/usr/libexec/callaudioshim.py
+Icon=audio-input-microphone
+NoDisplay=true
+X-KDE-autostart-phase=1
+X-KDE-StartupNotify=false

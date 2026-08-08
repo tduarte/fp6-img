@@ -17,6 +17,10 @@ set -eu
 
 KERNEL_REPO=https://forgejo.catcrafts.net/Catcrafts/milos-linux.git
 KERNEL_BRANCH=combined-stable
+IMSD_REPO=https://forgejo.catcrafts.net/Catcrafts/imsd.git
+# imsd 0.3.0: what the dev phone runs (0.2.7) + emergency-calling stage 1 +
+# the make build path the aport needs. Bump deliberately, not via tip-chasing.
+IMSD_COMMIT=1037958
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
 cd "$(dirname "$0")"
@@ -76,6 +80,7 @@ rm -rf "$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos" \
        "$WORK/pmaports/main/postmarketos-config-nftables"
 cp -r aports/device/linux-postmarketos-qcom-milos "$WORK/pmaports/device/testing/"
 cp -r aports/device/soc-fairphone-fp6-audio "$WORK/pmaports/device/"
+cp -r aports/device/callaudioshim "$WORK/pmaports/device/"
 cp -r aports/main/postmarketos-config-nftables "$WORK/pmaports/main/"
 cp -r aports/modem/imsd "$WORK/pmaports/modem/"
 
@@ -90,13 +95,19 @@ git -C "$WORK/milos-src" archive --prefix=milos-linux/ \
 	-o "$KAPORT/milos-linux-$COMMIT.tar.gz" HEAD
 sed -i "s/^_commit=.*/_commit=\"$COMMIT\"/" "$KAPORT/APKBUILD"
 
+# Same dance for imsd, pinned to a reviewed commit rather than branch tip.
+rm -rf "$WORK/imsd-src"
+git clone -q "$IMSD_REPO" "$WORK/imsd-src"
+git -C "$WORK/imsd-src" checkout -q "$IMSD_COMMIT"
+IAPORT="$WORK/pmaports/modem/imsd"
+git -C "$WORK/imsd-src" archive --prefix=imsd/ \
+	-o "$IAPORT/imsd-$IMSD_COMMIT.tar.gz" HEAD
+sed -i "s/^_commit=.*/_commit=\"$IMSD_COMMIT\"/" "$IAPORT/APKBUILD"
+
 # --- 3. configure pmbootstrap -------------------------------------------------
 # 'pmbootstrap config' refuses to run before a config exists ("run init
 # first"), so write the config file directly (INI, [pmbootstrap] section,
 # keys = pmb.core.Config attributes).
-# Stage 1 builds WITHOUT imsd: its aport sources the v0.3.0 tag, which is not
-# published yet. When it is: add "extra_packages = imsd" and enable the
-# checksum line below.
 # 'init' would also create the work dir and stamp its migration version;
 # do both ourselves (version derived from the installed pmb, not hardcoded).
 WORKDIR="$HOME/.local/var/pmbootstrap"
@@ -110,11 +121,11 @@ aports = $WORK/pmaports
 device = fairphone-fp6
 ui = plasma-mobile
 systemd = always
-extra_packages = soc-fairphone-fp6-audio
+extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd
 EOF
 
 pmbootstrap checksum linux-postmarketos-qcom-milos
-#pmbootstrap checksum imsd
+pmbootstrap checksum imsd
 
 # --- 4. build the image -------------------------------------------------------
 # Same default credentials as the official postmarketOS images.
@@ -132,7 +143,7 @@ cp -L "$EXPORT/fairphone-fp6.img" dist/fairphone-fp6.img
 	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
 	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "default login: user / 147147 (same as official postmarketOS images)"
-	echo "imsd:          not included yet (waiting on the v0.3.0 tag)"
+	echo "imsd:          $IMSD_REPO @ $IMSD_COMMIT (0.3.0)"
 } > dist/build-info.txt
 cp README.md dist/README.md
 

@@ -77,5 +77,7 @@ with the `aports/` overlay in this repository:
 - [x] Speaker-audio userspace files (`soc-fairphone-fp6-audio`: topology,
       amp config, UCM — byte-identical to the tested dev-phone set; blob
       provenance to be settled before this repo goes public)
-- [ ] imsd 0.3.0 tag (aport currently needs it published)
+- [x] imsd in the image (pinned to the public 0.3.0 commit; the phone's
+      working call stack incl. callaudioshim and the modem-daemon autostart
+      override ship as packages)
 - [ ] Nightly schedule once the first dispatched run is green
