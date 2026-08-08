@@ -100,7 +100,7 @@ mkdir -p "$WORK/pmaports/temp"
 cp -r aports/device/linux-postmarketos-qcom-milos "$WORK/pmaports/device/testing/"
 cp -r aports/device/soc-fairphone-fp6-audio "$WORK/pmaports/device/"
 cp -r aports/device/callaudioshim "$WORK/pmaports/device/"
-cp -r aports/device/fp6-no-suspend "$WORK/pmaports/device/"
+cp -r aports/device/fp6-device-tweaks "$WORK/pmaports/device/"
 cp -r aports/main/postmarketos-config-nftables "$WORK/pmaports/main/"
 cp -r aports/modem/imsd "$WORK/pmaports/modem/"
 # Alpine forks carrying the GNSS patches (libqmi !470 unreleased; MM !1463
@@ -151,7 +151,7 @@ aports = $WORK/pmaports
 device = fairphone-fp6
 ui = plasma-mobile
 systemd = always
-extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fp6-no-suspend
+extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fp6-device-tweaks
 EOF
 
 pmbootstrap checksum linux-postmarketos-qcom-milos

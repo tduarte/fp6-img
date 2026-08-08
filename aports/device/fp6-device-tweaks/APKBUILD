@@ -1,0 +1,44 @@
+# Device-critical FP6 configuration that no upstream package ships yet —
+# every piece here was once a hand-applied /etc file on the dev phone that a
+# reinstall silently lost:
+#  - masked sleep targets: wifi and BT share the WCN combo chip; idle-suspend
+#    (and BT-off) resets the shared firmware and kills wifi for ~40 minutes
+#  - inv-icm42600-spi module-load: the IMU sits on bitbanged SPI with a
+#    fallback-only DT node, so udev coldplug never autoloads it
+#  - accel poll udev rule: inv_icm42600 exposes scan_elements without a
+#    trigger; iio-sensor-proxy must use its poll backend or auto-rotate is dead
+#  - iio-sensor-proxy restart drop-in: revives it after the known boot-time
+#    libssc crash on unconfigured SSC
+maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
+pkgname=fp6-device-tweaks
+pkgver=2
+pkgrel=0
+pkgdesc="Fairphone 6 device-critical system configuration"
+url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
+arch="noarch"
+license="MIT"
+options="!check"
+source="
+	inv-icm42600.conf
+	81-fp6-accel-poll.rules
+	iio-sensor-proxy-restart.conf
+"
+
+package() {
+	for t in sleep suspend hibernate hybrid-sleep; do
+		mkdir -p "$pkgdir/etc/systemd/system"
+		ln -s /dev/null "$pkgdir/etc/systemd/system/$t.target"
+	done
+	install -Dm644 "$srcdir"/inv-icm42600.conf \
+		"$pkgdir"/etc/modules-load.d/inv-icm42600.conf
+	install -Dm644 "$srcdir"/81-fp6-accel-poll.rules \
+		"$pkgdir"/etc/udev/rules.d/81-fp6-accel-poll.rules
+	install -Dm644 "$srcdir"/iio-sensor-proxy-restart.conf \
+		"$pkgdir"/etc/systemd/system/iio-sensor-proxy.service.d/restart.conf
+}
+
+sha512sums="
+5e60fef47cb09cec7cab73464183dfd9e9cb32cebd1d20a67922c10c5a747eca8d106b66737d06af5c5c162a6baf37ab62a82709cc20911044face100d482919  inv-icm42600.conf
+cc13f6abc4538fef976c59893992dd2c193cd0eac5da37a9fb01ba421b3ba8ff303aa438ec2fe4d10f50165f90be211d4b2c39dc6ef58d0d320fba8182ccf287  81-fp6-accel-poll.rules
+1800ad5c11b4e38c10b0c72b2392a6dc978a4e37bcd964182adb90d7d9aa7afc74acf102e2051dbf864021c05821f683af8943e2729e1eaa195856a0bd635e09  iio-sensor-proxy-restart.conf
+"
