@@ -42,34 +42,8 @@ boot` — verified to write nothing), writes the boot partition from inside
 Linux where the bootloader's NV-wipe cannot see it, then reads the modem NV
 back and reports the result. The bootloader never writes `boot`.
 
-**Classic install** (simpler, but `fastboot flash boot` **zeroes the modem's
-NV** — cellular will be dead until you restore your `modemst` backup):
-
-```sh
-fastboot flash userdata fairphone-fp6.img
-fastboot flash boot boot.img
-fastboot erase dtbo
-fastboot reboot
-```
-
 Default login: `user` / `147147` (same as official postmarketOS images —
 change it). **Never re-lock the bootloader** with a custom image installed.
-
-> [!WARNING]
-> **`fastboot flash boot` zeroes the modem's NV storage on this device**
-> (`modemst1`/`modemst2`) — verified by isolation experiment; `fastboot erase
-> dtbo` and idle fastboot sessions are safe. Afterwards the modem reports no
-> IMEI and neither SIM slot answers (`no-atr-received`), eSIM included. The
-> eSIM profiles themselves are safe in the eUICC; stock Android silently
-> re-provisions the NV from `fsg` on boot, postmarketOS cannot.
->
-> Practical rules:
-> - **Back up first**: from a running postmarketOS (or rooted stock), `dd`
->   `/dev/disk/by-partlabel/modemst1` and `modemst2` to files, keep forever.
-> - **After install, restore them**: `dd` back and reboot — cellular returns.
-> - **Never update the kernel via fastboot** — installed systems update boot
->   through on-device `boot-deploy` (which apk kernel upgrades run
->   automatically), never tripping the wipe.
 
 ## VoLTE configuration
 
@@ -92,23 +66,10 @@ variable reference and carrier assumptions.
 with the `aports/` overlay in this repository:
 
 - `device/linux-postmarketos-qcom-milos` — the pmaports kernel aport,
-  repointed at `combined-stable` (source tarball generated with git-archive;
-  the Forgejo instance serves no source archives) with the exact kernel
-  config the development FP6 runs.
+  repointed at `combined-stable` with the exact kernel config the development FP6 runs.
 - `modem/imsd` — imsd, packaged from source. Its `provides=81voltd` keeps the
   conflicting modem-firmware IMS helper off the image (two IMS stacks cannot
   share one PDN).
 - `main/postmarketos-config-nftables` — adds the `-imsd` subpackage accepting
   imsd's IPsec-protected SIP ports on the IMS PDN (auto-installed alongside
   imsd).
-
-## Roadmap
-
-- [x] End-to-end pipeline validation (first complete image built 2026-08-08)
-- [x] Speaker-audio userspace files (`soc-fairphone-fp6-audio`: topology,
-      amp config, UCM — byte-identical to the tested dev-phone set; blob
-      provenance to be settled before this repo goes public)
-- [x] imsd in the image (pinned to the public 0.3.0 commit; the phone's
-      working call stack incl. callaudioshim and the modem-daemon autostart
-      override ship as packages)
-- [ ] Nightly schedule once the first dispatched run is green

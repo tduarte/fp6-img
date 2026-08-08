@@ -62,20 +62,36 @@ exec 3<&- 3>&- 2>/dev/null || true
 sleep 8
 
 # --- 4: write boot from Linux ---------------------------------------------------
-say "writing boot.img to boot_a from inside Linux (password: 147147)"
-cat <<'EOF'
-You will be asked for a password up to twice (ssh login, then sudo).
-On a fresh image both are: 147147
-EOF
-SSHOPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null"
+# One authenticated ssh connection is opened and kept alive (ControlMaster);
+# sudo self-answers with the image's default password via an askpass helper
+# (sudo -S would eat the first bytes of the boot image from stdin).
+PW=147147
+CTL="/tmp/fp6-install-ssh-$$"
+SSHOPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
+	-o ControlMaster=auto -o ControlPath=$CTL -o ControlPersist=120"
+SUDO="SUDO_ASKPASS=/tmp/.fp6-install-pw sudo -A"
+
+if command -v sshpass >/dev/null; then
+	say "connecting (default credentials, no typing needed)"
+	SSHCMD="sshpass -p $PW ssh $SSHOPTS"
+else
+	say "connecting - type the password ONCE (fresh image default: 147147)"
+	SSHCMD="ssh $SSHOPTS"
+fi
+# shellcheck disable=SC2086
+$SSHCMD "user@$PHONE" \
+	"printf '#!/bin/sh\necho $PW\n' > /tmp/.fp6-install-pw && chmod 700 /tmp/.fp6-install-pw && echo CONNECTED" \
+	|| die "could not connect to the phone"
+
+say "writing boot.img to boot_a from inside Linux"
 # shellcheck disable=SC2086
 cat "$BOOT" | ssh $SSHOPTS "user@$PHONE" \
-	'sudo dd of=/dev/disk/by-partlabel/boot_a bs=1M conv=fsync status=none && sync && echo BOOT-WRITTEN'
+	"$SUDO dd of=/dev/disk/by-partlabel/boot_a bs=1M conv=fsync status=none && sync && echo BOOT-WRITTEN"
 
 say "verifying modem NV survived"
 # shellcheck disable=SC2086
 Z=$(ssh $SSHOPTS "user@$PHONE" \
-	'sudo od -An -tx1 -N4096 /dev/disk/by-partlabel/modemst1 | sort -u | wc -l' 2>/dev/null || echo 0)
+	"$SUDO od -An -tx1 -N4096 /dev/disk/by-partlabel/modemst1 | sort -u | wc -l" 2>/dev/null || echo 0)
 if [ "$Z" -gt 2 ]; then
 	echo "modem NV intact - cellular will work."
 else
@@ -90,7 +106,9 @@ fi
 say "rebooting into the installed system"
 # shellcheck disable=SC2086
 ssh $SSHOPTS "user@$PHONE" \
-	'sudo setsid sh -c "sleep 2; /sbin/reboot" </dev/null >/dev/null 2>&1 & sleep 5' || true
+	"$SUDO setsid sh -c 'sleep 2; /sbin/reboot' </dev/null >/dev/null 2>&1 & sleep 5" || true
+# shellcheck disable=SC2086
+ssh $SSHOPTS -O exit "user@$PHONE" 2>/dev/null || true
 
 cat <<'EOF'
 
