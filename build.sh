@@ -61,6 +61,12 @@ sed -i "s/^_commit=.*/_commit=\"$COMMIT\"/" "$KAPORT/APKBUILD"
 # Stage 1 builds WITHOUT imsd: its aport sources the v0.3.0 tag, which is not
 # published yet. When it is: add "extra_packages = imsd" and enable the
 # checksum line below.
+# 'init' would also create the work dir and stamp its migration version;
+# do both ourselves (version derived from the installed pmb, not hardcoded).
+WORKDIR="$HOME/.local/var/pmbootstrap"
+mkdir -p "$WORKDIR/cache_git"
+python3 -c "import pmb.config; print(pmb.config.work_version)" > "$WORKDIR/version"
+
 mkdir -p "$HOME/.config"
 cat > "$HOME/.config/pmbootstrap_v3.cfg" <<EOF
 [pmbootstrap]
