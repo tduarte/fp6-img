@@ -24,6 +24,9 @@ makedepends="
 	meson
 	python3
 	"
+# fp6-img: crossdirect breaks meson compiler introspection (cc1 spawn
+# failure), same as modemmanager; build under plain qemu.
+options="!pmb:crossdirect"
 subpackages="
 	$pkgname-dev
 	$pkgname-doc
