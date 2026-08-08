@@ -41,15 +41,20 @@ Default login: `user` / `147147` (same as official postmarketOS images —
 change it). **Never re-lock the bootloader** with a custom image installed.
 
 > [!WARNING]
-> **Back up your modem's NV partitions before flashing.** Flash sessions have
-> been observed to zero `modemst1`/`modemst2` on this device, after which the
-> modem reports no IMEI and neither SIM slot answers (`no-atr-received`) —
-> including the eSIM. The profiles themselves are safe in the eUICC, but only
-> a restore of working `modemst` images brings access back; stock Android
-> re-provisions them on boot, postmarketOS cannot. Before your first flash:
-> `dd` both partitions to files from a rooted stock system (or from a running
-> pmOS: `/dev/disk/by-partlabel/modemst1` and `modemst2`) and keep them
-> forever. Restore with `dd` in the other direction, then reboot.
+> **`fastboot flash boot` zeroes the modem's NV storage on this device**
+> (`modemst1`/`modemst2`) — verified by isolation experiment; `fastboot erase
+> dtbo` and idle fastboot sessions are safe. Afterwards the modem reports no
+> IMEI and neither SIM slot answers (`no-atr-received`), eSIM included. The
+> eSIM profiles themselves are safe in the eUICC; stock Android silently
+> re-provisions the NV from `fsg` on boot, postmarketOS cannot.
+>
+> Practical rules:
+> - **Back up first**: from a running postmarketOS (or rooted stock), `dd`
+>   `/dev/disk/by-partlabel/modemst1` and `modemst2` to files, keep forever.
+> - **After install, restore them**: `dd` back and reboot — cellular returns.
+> - **Never update the kernel via fastboot** — installed systems update boot
+>   through on-device `boot-deploy` (which apk kernel upgrades run
+>   automatically), never tripping the wipe.
 
 ## VoLTE configuration
 
