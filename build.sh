@@ -10,6 +10,11 @@
 
 set -eu
 
+# HOST REQUIREMENT: the loop driver must be loaded on the host kernel
+# (modprobe loop + modules-load.d entry). Containers cannot load host
+# modules, and on some kernels opening /dev/loop-control from a container
+# does not autoload the driver either.
+
 KERNEL_REPO=https://forgejo.catcrafts.net/Catcrafts/milos-linux.git
 KERNEL_BRANCH=combined-stable
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
@@ -56,6 +61,14 @@ fi
 
 WORK=${FP6IMG_WORK:-$HOME/fp6img-work}
 mkdir -p "$WORK"
+
+# pmbootstrap swallows its subcommands' stderr into its own log; surface it
+# whenever this script dies so failures are diagnosable from the CI/console
+# output alone.
+trap 'rc=$?; if [ $rc -ne 0 ]; then
+	echo "=== build.sh failed (exit $rc); pmbootstrap log tail ==="
+	tail -60 "$HOME/.local/var/pmbootstrap/log.txt" 2>/dev/null || true
+fi' EXIT
 
 # --- 1. pmaports with our aports copied over ---------------------------------
 # pmbootstrap hard-errors when a pkgname exists in more than one aports dir,
