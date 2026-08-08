@@ -18,8 +18,10 @@ depends="
 	polkit
 	"
 depends_dev="libmm-glib=$pkgver-r$pkgrel"
+# fp6-img: $depends_dev removed from makedepends - the pinned own-subpackage
+# only resolves when the binary repo already carries this exact pkgrel, which
+# is never true for our r100 fork (MM does not need libmm-glib to build).
 makedepends="
-	$depends_dev
 	bash-completion-dev
 	dbus-dev
 	elogind-dev
