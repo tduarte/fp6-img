@@ -11,12 +11,16 @@
 #    libssc crash on unconfigured SSC
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=fp6-device-tweaks
-pkgver=2
+pkgver=3
 pkgrel=0
 pkgdesc="Fairphone 6 device-critical system configuration"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
 arch="noarch"
 license="MIT"
+# apk-native ban: with this meta installed, the resolver routes Plasma
+# Mobile's audio through real PulseAudio, which claims the card and runs
+# wireplumber in a video-only profile - no sinks, ever
+depends="!postmarketos-base-ui-audio-backend-pulseaudio"
 options="!check"
 source="
 	inv-icm42600.conf
