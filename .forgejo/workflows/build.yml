@@ -42,6 +42,36 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+      # Ship every locally built apk (kernel, modemmanager, libqmi, imsd,
+      # callaudioshim, audio files, ...) to the Forgejo Alpine registry, so
+      # installed systems get updates via 'apk upgrade' instead of losing
+      # the FP6 patches to the next upstream version bump. Requires the
+      # PACKAGE_TOKEN repo secret (catbot account, package:write scope);
+      # skips quietly until it exists. 409 = same version already published.
+      - name: Publish packages to the apk registry
+        env:
+          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+        run: |
+          if [ -z "$PACKAGE_TOKEN" ]; then
+            echo "no PACKAGE_TOKEN secret configured; skipping package publish"
+            exit 0
+          fi
+          apk add -q curl
+          found=0
+          for f in /home/build/.local/var/pmbootstrap/packages/*/aarch64/*.apk; do
+            [ -e "$f" ] || continue
+            found=1
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              --user "catbot:$PACKAGE_TOKEN" --upload-file "$f" \
+              "https://forgejo.catcrafts.net/api/packages/Catcrafts/alpine/edge/fp6")
+            case "$code" in
+              201) echo "published: $(basename "$f")" ;;
+              409) echo "already published: $(basename "$f")" ;;
+              *)   echo "FAILED ($code): $(basename "$f")"; exit 1 ;;
+            esac
+          done
+          [ "$found" = 1 ] || { echo "no packages found to publish"; exit 1; }
+
       - name: Update rolling 'latest' tag
         run: |
           git config --global --add safe.directory "$PWD"

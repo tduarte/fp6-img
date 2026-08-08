@@ -1,0 +1,31 @@
+# Enables the Catcrafts FP6 package repository on the installed system:
+# installs the Forgejo package-registry signing key and appends the repo URL
+# to /etc/apk/repositories. With this, 'apk upgrade' pulls the CI-published
+# kernel/modemmanager/libqmi/imsd builds instead of losing the FP6 patches
+# to the next upstream version bump.
+maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
+pkgname=catcrafts-fp6-repo
+pkgver=1
+pkgrel=0
+pkgdesc="Catcrafts FP6 apk repository (signing key + repositories entry)"
+url="https://forgejo.catcrafts.net/Catcrafts/-/packages"
+arch="noarch"
+license="MIT"
+options="!check"
+install="$pkgname.post-install $pkgname.post-upgrade"
+_keyname="catcrafts@f79ff8fc14285f7824dd6a8c36ac814751da19ab7ed47c516f089a311ab7fe57.rsa.pub"
+source="
+	$_keyname
+	$pkgname.post-install
+	$pkgname.post-upgrade
+"
+
+package() {
+	install -Dm644 "$srcdir/$_keyname" "$pkgdir/etc/apk/keys/$_keyname"
+}
+
+sha512sums="
+3ea75c60a7df9f7ff96cedf1c5e54d0f3b95f85e08001de0a3cc01227c7772b1fdde9d05e3d6331ee39875dfd8151536b45db735231a48b50c38dd98bc1036f8  catcrafts@f79ff8fc14285f7824dd6a8c36ac814751da19ab7ed47c516f089a311ab7fe57.rsa.pub
+676c97c31729c49d87ce1c2421540e92cb602b27fd0eb09f5fc3925fae1529d917c0cf145bc7e7c33067baa63d05bf6ab4074640f3c2c18a90aa6e41a5c80d79  catcrafts-fp6-repo.post-install
+676c97c31729c49d87ce1c2421540e92cb602b27fd0eb09f5fc3925fae1529d917c0cf145bc7e7c33067baa63d05bf6ab4074640f3c2c18a90aa6e41a5c80d79  catcrafts-fp6-repo.post-upgrade
+"
