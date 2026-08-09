@@ -26,18 +26,6 @@ ROOTFS=${ROOTFS:-fairphone-fp6.img}
 say() { printf '\n== %s ==\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-# This bootloader occasionally hangs on individual fastboot commands (its
-# --set-active is a documented offender), and desktop ModemManager instances
-# love to probe freshly plugged fastboot devices, blocking the USB claim.
-# Give every command a deadline and one retry instead of hanging forever.
-fb() { # fb <timeout-seconds> <fastboot args...>
-	_t=$1; shift
-	timeout "$_t" fastboot "$@" && return 0
-	echo "fastboot $1 timed out/failed - retrying once..." >&2
-	sleep 3
-	timeout "$_t" fastboot "$@"
-}
-
 # --- preflight ---------------------------------------------------------------
 command -v fastboot >/dev/null || die "fastboot not found (install android-tools)"
 command -v ssh >/dev/null || die "ssh not found"
@@ -67,14 +55,14 @@ read -r _
 
 # --- 1+2: safe fastboot writes -------------------------------------------------
 say "erasing dtbo"
-fb 60 erase dtbo || die "erase dtbo kept hanging - unplug/replug USB and re-run"
+fastboot erase dtbo
 
 say "flashing rootfs to userdata"
-fb 900 flash userdata "$ROOTFS" || die "userdata flash failed - re-run this script"
+fastboot flash userdata "$ROOTFS"
 
 # --- 3: RAM-boot the kernel, no write -----------------------------------------
 say "RAM-booting the new system"
-fb 120 boot "$BOOT" || die "RAM boot failed - re-run this script"
+fastboot boot "$BOOT"
 
 say "waiting for the phone to come up on the USB network ($PHONE)"
 # The phone side is reliable (it always configures 172.16.42.1 on its USB
@@ -147,7 +135,7 @@ cat "$BOOT" | ssh $SSHOPTS "user@$PHONE" \
 Z=$(ssh $SSHOPTS "user@$PHONE" \
 	"$SUDO od -An -tx1 -N4096 /dev/disk/by-partlabel/modemst1 | sort -u | wc -l" 2>/dev/null || echo 0)
 if [ "$Z" -gt 2 ]; then
-	echo "modem NV intact - cellular will work."
+	# echo "modem NV intact - cellular will work."
 else
 	cat <<'EOF'
 WARNING: the modem NV reads empty. If this device previously ran stock
