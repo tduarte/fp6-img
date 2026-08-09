@@ -135,7 +135,7 @@ cat "$BOOT" | ssh $SSHOPTS "user@$PHONE" \
 Z=$(ssh $SSHOPTS "user@$PHONE" \
 	"$SUDO od -An -tx1 -N4096 /dev/disk/by-partlabel/modemst1 | sort -u | wc -l" 2>/dev/null || echo 0)
 if [ "$Z" -gt 2 ]; then
-	# echo "modem NV intact - cellular will work."
+	echo "modem NV intact."
 else
 	cat <<'EOF'
 WARNING: the modem NV reads empty. If this device previously ran stock
