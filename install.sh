@@ -43,9 +43,15 @@ command -v fastboot >/dev/null || die "fastboot not found (install android-tools
 command -v ssh >/dev/null || die "ssh not found"
 [ -f "$BOOT" ] || die "$BOOT not found (download it from the release)"
 [ -f "$ROOTFS" ] || die "$ROOTFS not found (download it from the release)"
-fastboot devices 2>/dev/null | grep -q fastboot || \
+# NEVER pipe fastboot into grep -q or anything that exits early: the reader
+# quitting mid-output SIGPIPEs fastboot to death mid-transaction and leaves
+# the bootloader's fastboot state machine wedged - the NEXT command then
+# hangs. Capture completely, test afterwards.
+DEVICES=$(fastboot devices 2>/dev/null || true)
+printf '%s' "$DEVICES" | grep -q fastboot || \
 	die "no device in fastboot mode (Vol-down + Power, USB connected)"
-fastboot oem device-info 2>&1 | grep -q "Device unlocked: true" || \
+DEVINFO=$(timeout 20 fastboot oem device-info 2>&1 || true)
+printf '%s' "$DEVINFO" | grep -q "Device unlocked: true" || \
 	die "bootloader is LOCKED - nothing was changed. Unlock it first (OEM
        unlocking in Android developer settings + Fairphone's unlock code:
        https://support.fairphone.com/hc/en-us/articles/10492476238737),
