@@ -5,7 +5,7 @@
 # The tplg/UCM target filenames contain spaces, hence the safe source names.
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=soc-fairphone-fp6-audio
-pkgver=2
+pkgver=3
 pkgrel=0
 pkgdesc="Fairphone 6 audio topology, amp firmware and UCM profile"
 url="https://forgejo.catcrafts.net/Catcrafts/audioreach-topology"
@@ -17,7 +17,6 @@ source="
 	aw88261_acf.bin
 	ucm-milos-fp6.conf
 	HiFi.conf
-	51-fp6-ucm.conf
 	50-echo-cancel.conf
 "
 
@@ -30,9 +29,10 @@ package() {
 		"$pkgdir/usr/share/alsa/ucm2/conf.d/milos/Fairphone (Gen. 6).conf"
 	install -Dm644 "$srcdir"/HiFi.conf \
 		"$pkgdir"/usr/share/alsa/ucm2/Fairphone/fp6/HiFi.conf
-	# wireplumber: no ACP/soft-mixer for the UCM-driven card
-	install -Dm644 "$srcdir"/51-fp6-ucm.conf \
-		"$pkgdir"/etc/wireplumber/wireplumber.conf.d/51-fp6-ucm.conf
+	# NOTE deliberately NO wireplumber fragment: the old dev-phone's
+	# 51-fp6-ucm.conf (api.alsa.use-acp=false) kills node creation outright
+	# on a virgin wireplumber state - ACP reads the UCM verbs natively and
+	# produces correct ports (verified 2026-08-09 on a from-scratch install).
 	# AEC pair (ec_sink/ec_source) for VoLTE speakerphone calls
 	install -Dm644 "$srcdir"/50-echo-cancel.conf \
 		"$pkgdir"/etc/pipewire/pipewire.conf.d/50-echo-cancel.conf
@@ -43,6 +43,5 @@ sha512sums="
 a84b0595ae71b0bb594034a9f5fd77b984c9086cd917f32524c4b5172bc72a426e5d188d18dbccdb587f66d60fa15cad441fffcd48a3a1ce66335199b61e0350  aw88261_acf.bin
 3bb268f9fcb8d1c0b42741b67da42b6361bab259e7211d9930919995ebe7dcf67826e6d4f00ff5e4fe5b52067fe90d00212158c3b4879d1bee481e87f0623206  ucm-milos-fp6.conf
 2a189c3141fedc43f8eb19f4df1e43487223d524e27da3f948556d224cca1f493f6815ada191953fb79a19d5c5abadb21de7b3ece7b74b0929338c216e21e84a  HiFi.conf
-28a301e7eed738408660c1a303771a6cd1bc2bdd493bac95602f17c9b2cb56a0b9c0001b8002a99b0b1bd3dc1d2ee3f6696a8b629b86818d64605c643d2eec29  51-fp6-ucm.conf
 ec63fa5363738a43c9eee4b1be70201e2d2076ec817031fda087e61d781e81dc67351be44faf8b056a2939875a139cd909f7c311115bb1150e17ad4493846606  50-echo-cancel.conf
 "
