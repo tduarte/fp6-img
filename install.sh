@@ -33,23 +33,29 @@ command -v ssh >/dev/null || die "ssh not found"
 [ -f "$ROOTFS" ] || die "$ROOTFS not found (download it from the release)"
 fastboot devices 2>/dev/null | grep -q fastboot || \
 	die "no device in fastboot mode (Vol-down + Power, USB connected)"
+fastboot oem device-info 2>&1 | grep -q "Device unlocked: true" || \
+	die "bootloader is LOCKED - nothing was changed. Unlock it first (OEM
+       unlocking in Android developer settings + Fairphone's unlock code:
+       https://support.fairphone.com/hc/en-us/articles/10492476238737),
+       then re-run. Note that unlocking wipes the phone."
 
 cat <<'EOF'
-This will REPLACE the operating system on the connected Fairphone 6
-(userdata + boot). The modem's NV storage is preserved - that is the point
-of this installer. Press Enter to continue, Ctrl-C to abort.
+This will replace the operating system on the connected Fairphone 6 with catcrafts patched postmarketos. Keep the phone connected on USB for the entirety of this script's duration. 
+If this has been usefull please consider donating at https://ca
+WARNING: This is a early version of the install script for power users ahead of the official release, while tested this has not been trough the strict quality control the offical release will have.
+Press Enter to continue, Ctrl-C to abort.
 EOF
 read -r _
 
 # --- 1+2: safe fastboot writes -------------------------------------------------
-say "erasing dtbo (one-time; safe - does not touch modem NV)"
+say "erasing dtbo"
 fastboot erase dtbo
 
-say "flashing rootfs to userdata (this is the big one, be patient)"
+say "flashing rootfs to userdata"
 fastboot flash userdata "$ROOTFS"
 
 # --- 3: RAM-boot the kernel, no write -----------------------------------------
-say "RAM-booting the new system (nothing is written)"
+say "RAM-booting the new system"
 fastboot boot "$BOOT"
 
 say "waiting for the phone to come up on the USB network ($PHONE)"
@@ -98,24 +104,27 @@ SSHOPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
 	-o ControlMaster=auto -o ControlPath=$CTL -o ControlPersist=120"
 SUDO="SUDO_ASKPASS=/tmp/.fp6-install-pw sudo -A"
 
-if command -v sshpass >/dev/null; then
-	say "connecting (default credentials, no typing needed)"
-	SSHCMD="sshpass -p $PW ssh $SSHOPTS"
-else
-	say "connecting - type the password ONCE (fresh image default: 147147)"
-	SSHCMD="ssh $SSHOPTS"
-fi
+# ssh refuses to read a password from stdin (it wants the terminal), but
+# OpenSSH >= 8.4 honors an askpass helper even with a terminal attached via
+# SSH_ASKPASS_REQUIRE=force - so the known fresh-image password answers
+# itself. On older OpenSSH this falls back to one interactive prompt.
+ASKPASS=$(mktemp)
+printf '#!/bin/sh\necho %s\n' "$PW" > "$ASKPASS"
+chmod 700 "$ASKPASS"
+trap 'rm -f "$ASKPASS"' EXIT
+export SSH_ASKPASS="$ASKPASS" SSH_ASKPASS_REQUIRE=force DISPLAY="${DISPLAY:-:0}"
+
+say "connecting (fresh-image default credentials answer automatically)"
 # shellcheck disable=SC2086
-$SSHCMD "user@$PHONE" \
+ssh $SSHOPTS "user@$PHONE" \
 	"printf '#!/bin/sh\necho $PW\n' > /tmp/.fp6-install-pw && chmod 700 /tmp/.fp6-install-pw && echo CONNECTED" \
 	|| die "could not connect to the phone"
 
-say "writing boot.img to boot_a from inside Linux"
+say "writing boot.img to boot_a"
 # shellcheck disable=SC2086
 cat "$BOOT" | ssh $SSHOPTS "user@$PHONE" \
 	"$SUDO dd of=/dev/disk/by-partlabel/boot_a bs=1M conv=fsync status=none && sync && echo BOOT-WRITTEN"
 
-say "verifying modem NV survived"
 # shellcheck disable=SC2086
 Z=$(ssh $SSHOPTS "user@$PHONE" \
 	"$SUDO od -An -tx1 -N4096 /dev/disk/by-partlabel/modemst1 | sort -u | wc -l" 2>/dev/null || echo 0)
@@ -140,6 +149,6 @@ ssh $SSHOPTS -O exit "user@$PHONE" 2>/dev/null || true
 cat <<'EOF'
 
 DONE. The phone reboots into postmarketOS from its own boot partition.
-Log in as user / 147147 (change it!). For VoLTE, write your carrier's
+Log in as user / 147147. For VoLTE, write your carrier's
 P-CSCF into /etc/imsd.env and restart imsd - see the README.
 EOF
