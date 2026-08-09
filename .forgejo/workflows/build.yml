@@ -23,9 +23,11 @@ jobs:
     timeout-minutes: 420
     steps:
       # actions/checkout & friends are Node actions; bare alpine has no node.
-      # bash: required by the forgejo-release composite action.
+      # bash, curl, jq: required by the forgejo-release composite action —
+      # its setup_api falls back to apt-get when jq/curl are missing, which
+      # exits 127 on alpine.
       - name: Provision job container
-        run: apk add -q nodejs git bash
+        run: apk add -q nodejs git bash curl jq
 
       - name: Checkout
         uses: actions/checkout@v4
