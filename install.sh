@@ -26,6 +26,18 @@ ROOTFS=${ROOTFS:-fairphone-fp6.img}
 say() { printf '\n== %s ==\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
+# This bootloader occasionally hangs on individual fastboot commands (its
+# --set-active is a documented offender), and desktop ModemManager instances
+# love to probe freshly plugged fastboot devices, blocking the USB claim.
+# Give every command a deadline and one retry instead of hanging forever.
+fb() { # fb <timeout-seconds> <fastboot args...>
+	_t=$1; shift
+	timeout "$_t" fastboot "$@" && return 0
+	echo "fastboot $1 timed out/failed - retrying once..." >&2
+	sleep 3
+	timeout "$_t" fastboot "$@"
+}
+
 # --- preflight ---------------------------------------------------------------
 command -v fastboot >/dev/null || die "fastboot not found (install android-tools)"
 command -v ssh >/dev/null || die "ssh not found"
@@ -41,7 +53,7 @@ fastboot oem device-info 2>&1 | grep -q "Device unlocked: true" || \
 
 cat <<'EOF'
 This will replace the operating system on the connected Fairphone 6 with catcrafts patched postmarketos. Keep the phone connected on USB for the entirety of this script's duration. 
-If this has been usefull please consider donating at https://ca
+If this has been usefull please consider donating at https://bunq.me/catcrafts
 WARNING: This is a early version of the install script for power users ahead of the official release, while tested this has not been trough the strict quality control the offical release will have.
 Press Enter to continue, Ctrl-C to abort.
 EOF
@@ -49,14 +61,14 @@ read -r _
 
 # --- 1+2: safe fastboot writes -------------------------------------------------
 say "erasing dtbo"
-fastboot erase dtbo
+fb 60 erase dtbo || die "erase dtbo kept hanging - unplug/replug USB and re-run"
 
 say "flashing rootfs to userdata"
-fastboot flash userdata "$ROOTFS"
+fb 900 flash userdata "$ROOTFS" || die "userdata flash failed - re-run this script"
 
 # --- 3: RAM-boot the kernel, no write -----------------------------------------
 say "RAM-booting the new system"
-fastboot boot "$BOOT"
+fb 120 boot "$BOOT" || die "RAM boot failed - re-run this script"
 
 say "waiting for the phone to come up on the USB network ($PHONE)"
 # The phone side is reliable (it always configures 172.16.42.1 on its USB
