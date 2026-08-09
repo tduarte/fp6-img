@@ -120,7 +120,7 @@ chmod 700 "$ASKPASS"
 trap 'rm -f "$ASKPASS"' EXIT
 export SSH_ASKPASS="$ASKPASS" SSH_ASKPASS_REQUIRE=force DISPLAY="${DISPLAY:-:0}"
 
-say "connecting (fresh-image default credentials answer automatically)"
+say "connecting"
 # shellcheck disable=SC2086
 ssh $SSHOPTS "user@$PHONE" \
 	"printf '#!/bin/sh\necho $PW\n' > /tmp/.fp6-install-pw && chmod 700 /tmp/.fp6-install-pw && echo CONNECTED" \
