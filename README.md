@@ -37,13 +37,10 @@ cd fp6-img
 ./install.sh
 ```
 
-[`install.sh`](install.sh) and this README are attached to every release
-uncompressed as well, so you can read them before committing to the download.
-
-It erases dtbo, flashes the rootfs, **RAM-boots** the kernel (`fastboot
-boot` — verified to write nothing), writes the boot partition from inside
-Linux where the bootloader's NV-wipe cannot see it, then reads the modem NV
-back and reports the result. The bootloader never writes `boot`.
+`install.sh` erases dtbo, flashes the rootfs, **RAM-boots** the kernel
+(`fastboot boot` — verified to write nothing), writes the boot partition from
+inside Linux where the bootloader's NV-wipe cannot see it, then reads the modem
+NV back and reports the result. The bootloader never writes `boot`.
 
 Default login: `user` / `147147` (same as official postmarketOS images —
 change it). **Never re-lock the bootloader** with a custom image installed.

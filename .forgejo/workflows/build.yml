@@ -94,3 +94,9 @@ jobs:
           override: true
           release-dir: dist
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Empty, NOT 'false': the action guards its release-notes-assistant
+          # cache step with `if: ${{ inputs.release-notes-assistant }}`, where
+          # the default string 'false' is truthy. That step then can't reach the
+          # runner's cache server (it advertises the host's public IP) and burns
+          # ~4m40s per run on a connect timeout before reporting a miss.
+          release-notes-assistant: ''

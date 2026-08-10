@@ -177,20 +177,12 @@ EXPORT=/tmp/postmarketOS-export
 rm -rf "$EXPORT"
 pmbootstrap export "$EXPORT"
 
-{
-	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
-	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-	echo "default login: user / 147147 (same as official postmarketOS images)"
-	echo "imsd:          $IMSD_REPO @ $IMSD_COMMIT (0.3.0)"
-} > dist/build-info.txt
-cp README.md dist/README.md
-cp install.sh dist/install.sh
-
-# The images ship as one archive, not as loose files: the rootfs is 3.0 GiB
-# raw and 812 MiB under xz -6 (gzip -6 stops at 1144 MiB), and a bundle makes
-# it impossible to pair a boot.img with a rootfs from a different build.
-# README/install.sh/build-info stay loose in dist too, so they can be read
-# before committing to the download.
+# Everything ships as ONE archive, and dist/ holds nothing else: the rootfs is
+# 3.0 GiB raw and 812 MiB under xz -6 (gzip -6 stops at 1144 MiB), and a bundle
+# makes it impossible to pair a boot.img with a rootfs from a different build.
+# README/install.sh are not attached loose as well — they are readable in the
+# repository, and a second copy in the release only invites reading a stale one
+# (and a loose sha256sums.txt next to the archive's own is pure confusion).
 #
 # pmbootstrap export writes symlinks into its work dir; tar -h resolves them,
 # so the archive is built without a second 3 GiB copy on disk.
@@ -199,11 +191,16 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE/fp6-img"
 ln -s "$EXPORT/boot.img" "$STAGE/fp6-img/boot.img"
 ln -s "$EXPORT/fairphone-fp6.img" "$STAGE/fp6-img/fairphone-fp6.img"
-cp dist/build-info.txt dist/README.md dist/install.sh "$STAGE/fp6-img/"
-# sums of the extracted contents (the outer sha256sums.txt covers the archive)
+cp README.md install.sh "$STAGE/fp6-img/"
+{
+	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
+	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	echo "default login: user / 147147 (same as official postmarketOS images)"
+	echo "imsd:          $IMSD_REPO @ $IMSD_COMMIT (0.3.0)"
+} > "$STAGE/fp6-img/build-info.txt"
+# sums of the extracted contents
 (cd "$STAGE/fp6-img" && sha256sum -- * > sha256sums.txt)
 tar -C "$STAGE" -chf - fp6-img | xz -T0 -6 > dist/fp6-img.tar.xz
 rm -rf "$STAGE"
 
-(cd dist && sha256sum -- * > sha256sums.txt)
 ls -la dist/
