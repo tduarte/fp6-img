@@ -17,7 +17,8 @@
 #
 # Requirements on this machine: fastboot, ssh. Phone: bootloader unlocked,
 # in fastboot mode (Vol-down + Power), connected over USB.
-# Run from a directory containing boot.img and fairphone-fp6.img.
+# Run from the directory the release archive extracts to:
+#   tar xf fp6-img.tar.xz && cd fp6-img && ./install.sh
 
 PHONE=172.16.42.1
 BOOT=${BOOT:-boot.img}
@@ -29,8 +30,10 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 # --- preflight ---------------------------------------------------------------
 command -v fastboot >/dev/null || die "fastboot not found (install android-tools)"
 command -v ssh >/dev/null || die "ssh not found"
-[ -f "$BOOT" ] || die "$BOOT not found (download it from the release)"
-[ -f "$ROOTFS" ] || die "$ROOTFS not found (download it from the release)"
+[ -f "$BOOT" ] || die "$BOOT not found - run this from the extracted fp6-img
+       directory (tar xf fp6-img.tar.xz && cd fp6-img)"
+[ -f "$ROOTFS" ] || die "$ROOTFS not found - run this from the extracted fp6-img
+       directory (tar xf fp6-img.tar.xz && cd fp6-img)"
 # NEVER pipe fastboot into grep -q or anything that exits early: the reader
 # quitting mid-output SIGPIPEs fastboot to death mid-transaction and leaves
 # the bootloader's fastboot state machine wedged - the NEXT command then

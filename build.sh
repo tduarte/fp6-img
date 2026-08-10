@@ -34,7 +34,8 @@ if [ "$(id -u)" = 0 ]; then
 	# reads channels.cfg from origin/master (upstream pmaports moved to main).
 	# multipath-tools: kpartx; util-linux: losetup with --json support
 	# (pmbootstrap's host-tool checks + image mounting need both)
-	apk add -q git sudo openssl python3 py3-pip multipath-tools util-linux
+	apk add -q git sudo openssl python3 py3-pip multipath-tools util-linux \
+		tar xz
 	pip install -q --break-system-packages \
 		git+https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git@3.11.1
 	# The container cannot modprobe (no /lib/modules in here), but it doesn't
@@ -175,8 +176,6 @@ pmbootstrap install --password 147147
 EXPORT=/tmp/postmarketOS-export
 rm -rf "$EXPORT"
 pmbootstrap export "$EXPORT"
-cp -L "$EXPORT/boot.img" dist/boot.img
-cp -L "$EXPORT/fairphone-fp6.img" dist/fairphone-fp6.img
 
 {
 	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
@@ -186,6 +185,25 @@ cp -L "$EXPORT/fairphone-fp6.img" dist/fairphone-fp6.img
 } > dist/build-info.txt
 cp README.md dist/README.md
 cp install.sh dist/install.sh
+
+# The images ship as one archive, not as loose files: the rootfs is 3.0 GiB
+# raw and 812 MiB under xz -6 (gzip -6 stops at 1144 MiB), and a bundle makes
+# it impossible to pair a boot.img with a rootfs from a different build.
+# README/install.sh/build-info stay loose in dist too, so they can be read
+# before committing to the download.
+#
+# pmbootstrap export writes symlinks into its work dir; tar -h resolves them,
+# so the archive is built without a second 3 GiB copy on disk.
+STAGE="$WORK/stage"
+rm -rf "$STAGE"
+mkdir -p "$STAGE/fp6-img"
+ln -s "$EXPORT/boot.img" "$STAGE/fp6-img/boot.img"
+ln -s "$EXPORT/fairphone-fp6.img" "$STAGE/fp6-img/fairphone-fp6.img"
+cp dist/build-info.txt dist/README.md dist/install.sh "$STAGE/fp6-img/"
+# sums of the extracted contents (the outer sha256sums.txt covers the archive)
+(cd "$STAGE/fp6-img" && sha256sum -- * > sha256sums.txt)
+tar -C "$STAGE" -chf - fp6-img | xz -T0 -6 > dist/fp6-img.tar.xz
+rm -rf "$STAGE"
 
 (cd dist && sha256sum -- * > sha256sums.txt)
 ls -la dist/

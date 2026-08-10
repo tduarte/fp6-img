@@ -26,12 +26,19 @@ carriers are very welcome.
 
 ## Flashing
 
-Download `boot.img` and `fairphone-fp6.img` from the latest release and unlock
-the bootloader ([Fairphone's official process](https://support.fairphone.com/hc/en-us/articles/10492476238737)).
+Download `fp6-img.tar.xz` from the latest release and unlock the bootloader
+([Fairphone's official process](https://support.fairphone.com/hc/en-us/articles/10492476238737)).
 
 **Install**: with the phone in fastboot mode,
-run [`install.sh`](install.sh) (also attached to every release) from the
-directory holding the two images.
+
+```sh
+tar xf fp6-img.tar.xz
+cd fp6-img
+./install.sh
+```
+
+[`install.sh`](install.sh) and this README are attached to every release
+uncompressed as well, so you can read them before committing to the download.
 
 It erases dtbo, flashes the rootfs, **RAM-boots** the kernel (`fastboot
 boot` — verified to write nothing), writes the boot partition from inside
