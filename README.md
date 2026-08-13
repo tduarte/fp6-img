@@ -37,8 +37,7 @@ cd fp6-img
 ./install.sh
 ```
 
-`install.sh` erases dtbo, flashes the rootfs, **RAM-boots** the kernel
-(`fastboot boot` — verified to write nothing), writes the boot partition from
+`install.sh` erases dtbo, flashes the rootfs, **RAM-boots** the kernel, writes the boot partition from
 inside Linux where the bootloader's NV-wipe cannot see it, then reads the modem
 NV back and reports the result. The bootloader never writes `boot`.
 
