@@ -83,3 +83,8 @@ with the `aports/` overlay in this repository:
 - `main/postmarketos-config-nftables` — adds the `-imsd` subpackage accepting
   imsd's IPsec-protected SIP ports on the IMS PDN (auto-installed alongside
   imsd).
+- `device/catcrafts-fp6-repo` — subscribes the installed system to the
+  [Catcrafts apk registry](https://forgejo.catcrafts.net/Catcrafts/-/packages)
+  (signing key + `/etc/apk/repositories` entry). CI publishes every built
+  package there, so `apk upgrade` delivers kernel/imsd/GNSS updates between
+  image releases.

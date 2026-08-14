@@ -152,7 +152,7 @@ aports = $WORK/pmaports
 device = fairphone-fp6
 ui = plasma-mobile
 systemd = always
-extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fp6-device-tweaks,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel
+extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fp6-device-tweaks,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel
 EOF
 
 pmbootstrap checksum linux-postmarketos-qcom-milos
