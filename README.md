@@ -24,17 +24,6 @@ ambient light/proximity — plus VoLTE calls (both directions) through imsd.
 Verified on exactly one device / one carrier (KPN NL). Reports from other
 carriers are very welcome.
 
-## Known issues
-
-- **Fixed in builds ≥ `7.1.2_git20260814`**: intermittent GPU wedge under
-  bursty use (e.g. browser scrolling) — `a6xx_gmu_resume: GMU firmware
-  initialization timed out` followed by a hangcheck/recovery storm, sometimes
-  taking the session down. The kernel skipped the GPU's RPMh sleep sequence
-  on every GPU suspend (stale power votes broke a later GPU wake); fix
-  carried from upstream ("drm/msm/a6xx: Fix stale rpmh votes after suspend",
-  currently in drm-msm `msm-next`). Occasional
-  `delay in fenced register write (0x8c1)` lines are unrelated and harmless.
-
 ## Flashing
 
 Download `fp6-img.tar.xz` from the latest release and unlock the bootloader
