@@ -95,6 +95,7 @@ fi' EXIT
 clone_retry "$WORK/pmaports" -q --depth=1 "$PMAPORTS_REPO"
 rm -rf "$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos" \
        "$WORK/pmaports/main/postmarketos-config-nftables" \
+       "$WORK/pmaports/temp/libcamera" \
        "$WORK/pmaports/temp/libqmi" \
        "$WORK/pmaports/temp/modemmanager"
 mkdir -p "$WORK/pmaports/temp"
@@ -109,6 +110,9 @@ cp -r aports/modem/imsd "$WORK/pmaports/modem/"
 # draft) - deps of modemmanager/imsd, built from aports because r100 > repo.
 cp -r aports/temp/libqmi "$WORK/pmaports/temp/"
 cp -r aports/temp/modemmanager "$WORK/pmaports/temp/"
+# pmOS libcamera fork + the FP6 OV13B10 sensor-helper/properties patches
+# (r2 > pmOS r1)
+cp -r aports/temp/libcamera "$WORK/pmaports/temp/"
 
 # --- 2. pin the kernel source -------------------------------------------------
 # Source archives are disabled on the Forgejo instance, so generate the
@@ -167,6 +171,10 @@ pmbootstrap checksum modemmanager
 # the package is already current.
 pmbootstrap build --arch aarch64 libqmi
 pmbootstrap build --arch aarch64 modemmanager
+# libcamera is no makedepend of anything here - build it explicitly so the
+# patched -r2 exists for the publish step even if the install set resolves
+# it before the overlay is considered.
+pmbootstrap build --arch aarch64 libcamera
 
 # --- 4. build the image -------------------------------------------------------
 # Same default credentials as the official postmarketOS images.
