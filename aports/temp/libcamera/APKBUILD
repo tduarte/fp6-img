@@ -3,7 +3,7 @@ maintainer="Robert Mader <robert.mader@collabora.com>"
 pkgname=libcamera
 _pkgver=0.7.2
 pkgver=9999$_pkgver
-pkgrel=2
+pkgrel=3
 pkgdesc="Linux camera framework"
 url="https://libcamera.org/"
 arch="all"
@@ -61,6 +61,8 @@ source="https://gitlab.freedesktop.org/camera/libcamera/-/archive/v$_pkgver/libc
 	0002-libcamera-simple-Skip-hwISP-formats-if-swISP-is-acti.patch
 	0003-libipa-Add-OV13B10-camera-sensor-helper.patch
 	0004-libcamera-sensor-Add-OV13B10-sensor-properties.patch
+	0005-libipa-Add-camera-sensor-helper-for-IMX896.patch
+	0006-libcamera-sensor-Add-IMX896-sensor-properties.patch
 	qcam.desktop
 	$_tuning_files
 	"
@@ -178,6 +180,8 @@ eef5e38efc874f2049d17f08b04d9f21c3e4616f66873358cd2c446e651f78d6952ae25ee13a6ef9
 191dfa09cfd08bcdf0d0d07410d17af590cf78b8bc8f8b7587fd2dc1c645a9ca07f2926b5d98381c011319b1f4e1d6195dd0d6dba65fd8c723882e6be0d6117d  0002-libcamera-simple-Skip-hwISP-formats-if-swISP-is-acti.patch
 594e2c31bd51dac8f5f184b026301028431b1c67e48edb245790444713b64e927fac99cb8a33f0b7042c9689359079158b3f1d344b250904472c977f1313f83e  0003-libipa-Add-OV13B10-camera-sensor-helper.patch
 89e0fc4a12aa4d5fbdc77b50e28b0a6d2cf8dfeb884b536507b6c24aa2ae5c616a32a517deb086e3284c72a82e6d6ddcf6eaa88f6c1c021adc6a0167194b7711  0004-libcamera-sensor-Add-OV13B10-sensor-properties.patch
+f746cff46f78a8e7bd4cadd72c4ab05044971e36e412a56d4a14a420aeb1c9168b1f4ef411f4cc81a596159cab3d8a3713214a4ff0b2a4daf839b1a380c09b6e  0005-libipa-Add-camera-sensor-helper-for-IMX896.patch
+1ac9747c941787c7ae76ed6520585b0d26494eb0f697bd74a9155ed04736a7b61f838dfb1bad01cf13b9cdd36f644a95a6ec1cbfe4f5c5a42cb23d4b6d9aa166  0006-libcamera-sensor-Add-IMX896-sensor-properties.patch
 22167a4eceb6d1b40b0b7c45fdf116c71684f5340de7f767535cb8e160ad9d2ae0f00cb3d461f73a344520a48a4641cf46226841d78bee06bfbfd2a91337f754  qcam.desktop
 2ee566653b17d565d2c0de67cbe6ebad25df5aac6051cad78e6bae52016fa2ca0247e964d735ac776b3e0bd447ead9c4fcb26cd7629228cdba3ceb91b46f378f  hi846.yaml
 55dab9dcb9b1982143b9d63e4e51138c5bffd7c8f4a8e4e122750b3ad9d475446956bc297d9f564819ade4be75a575d06633a064e14f8ba3ef77986783c5f067  imx355.yaml
