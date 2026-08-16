@@ -77,6 +77,21 @@ clone_retry() { # clone_retry <dest> <git clone args...>
 	return 1
 }
 
+# Source-fetching pmbootstrap steps hit gitlab.freedesktop.org (libqmi,
+# modemmanager AND libcamera all live there), which intermittently 503s —
+# run #25 died on exactly that during 'checksum libqmi'. Same reasoning as
+# clone_retry: a transient upstream hiccup should cost a retry, not the run.
+retry() { # retry <description> <cmd...>
+	_desc=$1; shift
+	for _i in 1 2 3; do
+		"$@" && return 0
+		echo "$_desc failed (attempt $_i/3), retrying in 30s..." >&2
+		sleep 30
+	done
+	echo "$_desc failed after 3 attempts" >&2
+	return 1
+}
+
 WORK=${FP6IMG_WORK:-$HOME/fp6img-work}
 mkdir -p "$WORK"
 
@@ -162,19 +177,19 @@ EOF
 
 pmbootstrap checksum linux-postmarketos-qcom-milos
 pmbootstrap checksum imsd
-pmbootstrap checksum libqmi
-pmbootstrap checksum modemmanager
+retry "checksum libqmi" pmbootstrap checksum libqmi
+retry "checksum modemmanager" pmbootstrap checksum modemmanager
 
 # pmbootstrap's install-time build plan is not dependency-ordered (it tried
 # building modemmanager before the libqmi its makedepends require); build
 # the GNSS stack bottom-up explicitly. 'pmbootstrap build' is a no-op when
 # the package is already current.
-pmbootstrap build --arch aarch64 libqmi
-pmbootstrap build --arch aarch64 modemmanager
+retry "build libqmi" pmbootstrap build --arch aarch64 libqmi
+retry "build modemmanager" pmbootstrap build --arch aarch64 modemmanager
 # libcamera is no makedepend of anything here - build it explicitly so the
 # patched -r2 exists for the publish step even if the install set resolves
 # it before the overlay is considered.
-pmbootstrap build --arch aarch64 libcamera
+retry "build libcamera" pmbootstrap build --arch aarch64 libcamera
 
 # --- 4. build the image -------------------------------------------------------
 # Same default credentials as the official postmarketOS images.
