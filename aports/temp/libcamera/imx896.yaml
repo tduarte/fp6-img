@@ -13,11 +13,11 @@
 # CT nodes = the chromatix CCT trigger midpoints: 2800 (A), 4000 (TL84),
 # 5750 (merged D50/D65 region).
 #
-# No blackLevel is set: the IMX896 pedestal has not been measured on this
-# hardware and no datasheet value is available (the softISP then estimates
-# it dynamically per frame). Once a dark-frame measurement exists, add
-#   - BlackLevel:
-#       blackLevel: <16-bit value>
+# blackLevel: measured on the FP6 2026-08-17 (raw RDI dark frames, phone
+# face-down, min analogue gain): 10-bit pedestal 64.0 exact (mean 63.98,
+# median 64, p1/p99 63/65) -> 4096 on the 16-bit scale. The softISP's
+# dynamic estimate ran at 48, leaving a 16-code residual the CCM amplified
+# into colour casts in dark regions.
 #
 # PROVENANCE / LICENSE: the matrices are numeric calibration data read out
 # of the proprietary vendor blob (measured spectral response of this
@@ -30,6 +30,7 @@
 version: 1
 algorithms:
   - BlackLevel:
+      blackLevel: 4096
   - Awb:
   - Ccm:
       ccms:
