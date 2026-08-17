@@ -77,10 +77,10 @@ clone_retry() { # clone_retry <dest> <git clone args...>
 	return 1
 }
 
-# Source-fetching pmbootstrap steps hit gitlab.freedesktop.org (libqmi,
-# modemmanager AND libcamera all live there), which intermittently 503s —
-# run #25 died on exactly that during 'checksum libqmi'. Same reasoning as
-# clone_retry: a transient upstream hiccup should cost a retry, not the run.
+# Build steps still install their makedepends over the network; same
+# reasoning as clone_retry: a transient mirror hiccup should cost a retry,
+# not the run. (The gitlab.freedesktop.org archive fetches that killed runs
+# #25/#27/#30/#31 are gone — section 2 generates those tarballs locally.)
 retry() { # retry <description> <cmd...>
 	_desc=$1; shift
 	for _i in 1 2 3; do
@@ -155,6 +155,34 @@ git -C "$WORK/imsd-src" archive --prefix=imsd/ \
 	-o "$IAPORT/imsd-$IMSD_COMMIT.tar.gz" HEAD
 sed -i "s/^_commit=.*/_commit=\"$IMSD_COMMIT\"/" "$IAPORT/APKBUILD"
 
+# Same again for the gitlab.freedesktop.org packages (libqmi, modemmanager,
+# libcamera): their pinned tarballs came from fd.o's on-demand archive
+# endpoint, which 503/504s for hours at a stretch — runs #25, #27, #30 and
+# #31 all died there, outlasting any in-run retry. git clone is served from
+# a different code path and holds up; generate the tarballs ourselves. The
+# pins stay single-sourced in the APKBUILDs, read back out here.
+
+apkbuild_var() { # apkbuild_var <aport dir> <variable>
+	sed -n "s/^$2=//p" "$1/APKBUILD" | tr -d '"'
+}
+
+fdo_tarball() { # fdo_tarball <repo url> <aport dir> <tarball dirname> <ref>
+	clone_retry "$WORK/fdo-src" -q --bare "$1"
+	git -C "$WORK/fdo-src" archive --prefix="$3/" -o "$2/$3.tar.gz" "$4"
+	rm -rf "$WORK/fdo-src"
+}
+
+FDO=https://gitlab.freedesktop.org
+QMI_COMMIT=$(apkbuild_var "$WORK/pmaports/temp/libqmi" _commit)
+fdo_tarball "$FDO/mobile-broadband/libqmi.git" \
+	"$WORK/pmaports/temp/libqmi" "libqmi-$QMI_COMMIT" "$QMI_COMMIT"
+MM_COMMIT=$(apkbuild_var "$WORK/pmaports/temp/modemmanager" _commit)
+fdo_tarball "$FDO/mobile-broadband/ModemManager.git" \
+	"$WORK/pmaports/temp/modemmanager" "ModemManager-$MM_COMMIT" "$MM_COMMIT"
+CAM_VER=$(apkbuild_var "$WORK/pmaports/temp/libcamera" _pkgver)
+fdo_tarball "$FDO/camera/libcamera.git" \
+	"$WORK/pmaports/temp/libcamera" "libcamera-v$CAM_VER" "v$CAM_VER"
+
 # --- 3. configure pmbootstrap -------------------------------------------------
 # 'pmbootstrap config' refuses to run before a config exists ("run init
 # first"), so write the config file directly (INI, [pmbootstrap] section,
@@ -175,10 +203,15 @@ systemd = always
 extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fp6-device-tweaks,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel
 EOF
 
+# All five source tarballs are generated locally above, so every checksum
+# step is offline. libcamera needs a checksum step now too: its committed
+# sums were for the fd.o-served tarball, and git-archive output is not
+# byte-identical to it (verified: sha512 differs).
 pmbootstrap checksum linux-postmarketos-qcom-milos
 pmbootstrap checksum imsd
-retry "checksum libqmi" pmbootstrap checksum libqmi
-retry "checksum modemmanager" pmbootstrap checksum modemmanager
+pmbootstrap checksum libqmi
+pmbootstrap checksum modemmanager
+pmbootstrap checksum libcamera
 
 # pmbootstrap's install-time build plan is not dependency-ordered (it tried
 # building modemmanager before the libqmi its makedepends require); build
