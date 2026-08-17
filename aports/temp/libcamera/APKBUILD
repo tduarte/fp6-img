@@ -3,7 +3,7 @@ maintainer="Robert Mader <robert.mader@collabora.com>"
 pkgname=libcamera
 _pkgver=0.7.2
 pkgver=9999$_pkgver
-pkgrel=4
+pkgrel=5
 pkgdesc="Linux camera framework"
 url="https://libcamera.org/"
 arch="all"
@@ -70,6 +70,7 @@ source="https://gitlab.freedesktop.org/camera/libcamera/-/archive/v$_pkgver/libc
 	0011-libcamera-pipeline-simple-Apply-the-lens-position-un.patch
 	0012-libcamera-software_isp-af-Harden-the-lens-control-ha.patch
 	0013-libcamera-software_isp-af-Add-AfMode-and-focus-witho.patch
+	0014-libcamera-software_isp-af-Re-baseline-the-scene-refe.patch
 	qcam.desktop
 	$_tuning_files
 	"
@@ -196,6 +197,7 @@ c8ddc64ab943d9b215f4c997f2629e4403744c0ddb5de88cd42d384506a27c0762191eddd4d13559
 3965405be757917030c89db5da60aa226d0f0591e213d055d8312dbddee0c3d81fbcaa5928d6de4d3cb636572a27261d8686d87ae39b9634d70b33cf8388dc73  0011-libcamera-pipeline-simple-Apply-the-lens-position-un.patch
 8734e27966bd1bc5a4b0324a3d8a3ee4ab371f6d1536500b2bb44d49bde874c3fd6f244312332226c352e4716ba12fb72bf51e64b9e97cf6fa646aa6dfef3277  0012-libcamera-software_isp-af-Harden-the-lens-control-ha.patch
 dce81c2863ff6b9374115325f4af14ac5d396a6e2aee12f87d55a47d1d0bda860ae2af5a9d6885b126e20a12b7f3f40e49a2b9d738f94c04177bff6149da64e1  0013-libcamera-software_isp-af-Add-AfMode-and-focus-witho.patch
+18ed6a03fbe3bcd750fac280831d1e62f2a2e35f76880535f2dc16ff196308512535e077ab0d8a923ad241090713edb53d1777e0dd6e5dcc10de495db1277052  0014-libcamera-software_isp-af-Re-baseline-the-scene-refe.patch
 22167a4eceb6d1b40b0b7c45fdf116c71684f5340de7f767535cb8e160ad9d2ae0f00cb3d461f73a344520a48a4641cf46226841d78bee06bfbfd2a91337f754  qcam.desktop
 2ee566653b17d565d2c0de67cbe6ebad25df5aac6051cad78e6bae52016fa2ca0247e964d735ac776b3e0bd447ead9c4fcb26cd7629228cdba3ceb91b46f378f  hi846.yaml
 55dab9dcb9b1982143b9d63e4e51138c5bffd7c8f4a8e4e122750b3ad9d475446956bc297d9f564819ade4be75a575d06633a064e14f8ba3ef77986783c5f067  imx355.yaml
