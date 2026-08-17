@@ -1,0 +1,51 @@
+# libcamera softISP tuning for the Fairphone 6 main camera (Sony IMX896).
+#
+# CCMs extracted from the FP6 stock Android tuning blob
+# com.qti.tuned.fp6_tsp_imx896.bin (vendor_a.img, sha256 0500766f...c1a5d29f),
+# CamX cc13_ope_v2 module, tree root at 0x2709fe: 3 lux zones, 3-5 CCT
+# regions each, offsets all zero, rows sum to 1.0. This file carries the
+# BRIGHT zone (lux-index trigger 1-200) — the true-color tuning, same
+# convention as the sibling ov13b10.yaml. Note the bright zone has only
+# three CT nodes and merges D50/D65 into one 4800-6700 K region (node
+# placed at its 5750 K midpoint); the lowlight zone has proper 5000/6500 K
+# nodes but at reduced saturation (chroma-noise hiding) — see
+# chromatix/imx896-ccm-awb-extracted.txt for all 12 matrices.
+# CT nodes = the chromatix CCT trigger midpoints: 2800 (A), 4000 (TL84),
+# 5750 (merged D50/D65 region).
+#
+# No blackLevel is set: the IMX896 pedestal has not been measured on this
+# hardware and no datasheet value is available (the softISP then estimates
+# it dynamically per frame). Once a dark-frame measurement exists, add
+#   - BlackLevel:
+#       blackLevel: <16-bit value>
+#
+# PROVENANCE / LICENSE: the matrices are numeric calibration data read out
+# of the proprietary vendor blob (measured spectral response of this
+# sensor, not authored expression). Shipping decided 2026-08-17 by the
+# project owner, consistent with existing practice in this image; NOT
+# marked CC0. Durable replacement: measure our own matrices from a colour
+# chart with libcamera's tuning tooling.
+%YAML 1.1
+---
+version: 1
+algorithms:
+  - BlackLevel:
+  - Awb:
+  - Ccm:
+      ccms:
+        - ct: 2800
+          ccm: [ 1.593410, -0.552769, -0.040641,
+                -0.166429,  1.170414, -0.003985,
+                 0.004114, -0.855526,  1.851411 ]
+        - ct: 4000
+          ccm: [ 1.612519, -0.785270,  0.172751,
+                -0.110672,  1.189965, -0.079293,
+                 0.091939, -0.965137,  1.873197 ]
+        - ct: 5750
+          ccm: [ 1.900000, -0.581250, -0.318750,
+                -0.292500,  1.778126, -0.485626,
+                 0.014573, -0.734843,  1.720270 ]
+  - Adjust:
+  - Agc:
+  - Af:
+...
