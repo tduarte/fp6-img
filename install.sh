@@ -59,7 +59,7 @@ read -r _
 # --- 1+2: safe fastboot writes -------------------------------------------------
 # Both slots: a bare `erase dtbo` resolves to the current slot only, leaving
 # the other one able to boot stock if the bootloader ever falls back to it.
-say "erasing dtbo (both slots)"
+say "erasing dtbo"
 fastboot erase dtbo_a
 fastboot erase dtbo_b
 
