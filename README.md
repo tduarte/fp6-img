@@ -1,7 +1,7 @@
 # fp6-img
 
 Flashable [postmarketOS](https://postmarketos.org/) images for the
-**Fairphone 6**, built nightly from the
+**Fairphone 6/6+**, built nightly from the
 [Catcrafts milos-linux](https://forgejo.catcrafts.net/Catcrafts/milos-linux)
 `combined-stable` kernel branch, with
 [imsd](https://forgejo.catcrafts.net/Catcrafts/imsd) (userspace VoLTE)
