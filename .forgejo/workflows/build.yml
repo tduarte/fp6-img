@@ -89,7 +89,7 @@ jobs:
           url: ${{ github.server_url }}
           repo: ${{ github.repository }}
           tag: latest
-          title: Latest FP6 postmarketOS image (EMERGENCY CALLING UNVERIFIED)
+          title: Latest FP6 postmarketOS image
           prerelease: true
           override: true
           release-dir: dist
