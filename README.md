@@ -10,11 +10,6 @@ preinstalled.
 Maintained by [Jorijn van der Graaf](https://catcrafts.net/about)
 (TheMightyCat) at [Catcrafts](https://catcrafts.net/).
 
-> [!CAUTION]
-> **Emergency calling is unverified.** Calls (including 112/911) go through
-> imsd, whose emergency path is spec-shaped but has never been verified
-> against a live network.
-
 ## What works
 
 Everything on the `combined-stable` branch: display, touch, wifi, cellular
