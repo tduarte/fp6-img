@@ -50,7 +50,7 @@ printf '%s' "$DEVINFO" | grep -q "Device unlocked: true" || \
 
 cat <<'EOF'
 This will replace the operating system on the connected Fairphone 6 with catcrafts patched postmarketos. Keep the phone connected on USB for the entirety of this script's duration. 
-If this has been usefull please consider donating at https://bunq.me/catcrafts
+If this has been usefull please consider donating at https://catcrafts.net/shop/donation
 WARNING: This is a early version of the install script for power users ahead of the official release, while tested this has not been trough the strict quality control the offical release will have.
 Press Enter to continue, Ctrl-C to abort.
 EOF
