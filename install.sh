@@ -7,7 +7,7 @@
 # until restored. Isolated by experiment, 2026-08-09 (fp6 journal/modem).
 #
 # This installer never lets the bootloader write boot:
-#   1. fastboot erase dtbo          (verified safe)
+#   1. fastboot erase dtbo_a/_b     (verified safe)
 #   2. fastboot flash userdata      (rootfs; not a boot write - believed safe,
 #                                    final isolation pending; step 5 verifies)
 #   3. fastboot boot boot.img       (RAM boot - writes nothing; verified safe)
@@ -57,8 +57,11 @@ EOF
 read -r _
 
 # --- 1+2: safe fastboot writes -------------------------------------------------
-say "erasing dtbo"
-fastboot erase dtbo
+# Both slots: a bare `erase dtbo` resolves to the current slot only, leaving
+# the other one able to boot stock if the bootloader ever falls back to it.
+say "erasing dtbo (both slots)"
+fastboot erase dtbo_a
+fastboot erase dtbo_b
 
 say "flashing rootfs to userdata"
 fastboot flash userdata "$ROOTFS"
@@ -137,9 +140,7 @@ cat "$BOOT" | ssh $SSHOPTS "user@$PHONE" \
 # shellcheck disable=SC2086
 Z=$(ssh $SSHOPTS "user@$PHONE" \
 	"$SUDO od -An -tx1 -N4096 /dev/disk/by-partlabel/modemst1 | sort -u | wc -l" 2>/dev/null || echo 0)
-if [ "$Z" -gt 2 ]; then
-	# echo "modem NV intact."
-else
+if [ "$Z" -le 2 ]; then
 	cat <<'EOF'
 WARNING: the modem NV reads empty. If this device previously ran stock
 Android, its factory copy (fsg) is still on the device but postmarketOS
