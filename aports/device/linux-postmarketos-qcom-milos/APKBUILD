@@ -1,12 +1,12 @@
-# Fork of pmaports device/testing/linux-postmarketos-qcom-milos (7.1.2-r0),
+# Fork of pmaports device/testing/linux-postmarketos-qcom-milos (7.2.0-r0),
 # overlaid via pmbootstrap so it shadows the upstream aport. Differences:
-# source is the Catcrafts combined-stable branch (upstream v7.1.2-milos tag +
+# source is the Catcrafts combined-stable branch (upstream v7.2.0-milos tag +
 # the FP6 bring-up carries), and the config is the exact one the development
 # FP6 runs, plus CONFIG_EFI_ZBOOT for the packaging below.
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 _flavor="postmarketos-qcom-milos"
 pkgname=linux-$_flavor
-pkgver=7.1.2
+pkgver=7.2.0
 # always sorts above the upstream aport (r0..r99)
 pkgrel=100
 pkgdesc="Milos mainline kernel + Catcrafts FP6 bring-up carries (combined-stable)"
