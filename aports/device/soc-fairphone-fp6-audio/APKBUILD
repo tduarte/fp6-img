@@ -3,14 +3,21 @@
 # branch fp6), the AW88261 amp config blob, and the UCM profile. Files are
 # byte-identical to the ones deployed and tested on the development FP6.
 # The tplg/UCM target filenames contain spaces, hence the safe source names.
+#
+# Licensing: the topology (built from BSD-3-Clause audioreach-topology
+# sources) and the UCM/pipewire configs are BSD-3-Clause. aw88261_acf.bin
+# is a verbatim proprietary Awinic amp-config blob extracted from the
+# FP6's stock vendor partition; its redistribution status is unresolved
+# (candidate for FairBlobs adoption or install-time on-device extraction
+# from the stock vendor partition, which pmOS installs leave in place).
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=soc-fairphone-fp6-audio
 pkgver=3
-pkgrel=0
+pkgrel=1
 pkgdesc="Fairphone 6 audio topology, amp firmware and UCM profile"
 url="https://forgejo.catcrafts.net/Catcrafts/audioreach-topology"
 arch="noarch"
-license="BSD-3-Clause"
+license="BSD-3-Clause AND proprietary"
 options="!check"
 source="
 	fp6-tplg.bin
