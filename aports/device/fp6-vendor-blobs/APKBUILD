@@ -1,0 +1,47 @@
+# First-boot, on-device extraction of proprietary blobs from the stock
+# Android partitions, so the image never has to ship or distribute them.
+# pmOS installs flash only boot+userdata: the stock vendor/dsp partitions
+# stay on every installed unit, and the device duplicates files it already
+# lawfully contains, for its own operation. Design, legal frame and the
+# on-phone verification: fp6 repo journal/blobs/.
+#
+# Consumers depend on this package and install a manifest fragment into
+# /usr/share/fp6-vendor-blobs/manifest.d/ (syntax in the extract script);
+# their post-install/post-upgrade should also run
+# /usr/lib/fp6-vendor-blobs/extract --if-device so a package upgrade that
+# drops a previously-shipped blob restores the file immediately instead of
+# at the next boot. First consumer: soc-fairphone-fp6-audio (aw88261 acf).
+maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
+pkgname=fp6-vendor-blobs
+pkgver=1
+pkgrel=0
+pkgdesc="On-device extraction of vendor blobs from the stock Android partitions"
+url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
+arch="noarch"
+license="MIT"
+# fallback mapper for when the initramfs didn't map the dynamic partitions
+depends="make-dynpart-mappings"
+options="!check"
+source="
+	fp6-vendor-blobs-extract
+	fp6-vendor-blobs.service
+"
+
+package() {
+	install -Dm755 "$srcdir"/fp6-vendor-blobs-extract \
+		"$pkgdir"/usr/lib/fp6-vendor-blobs/extract
+	install -Dm644 "$srcdir"/fp6-vendor-blobs.service \
+		"$pkgdir"/usr/lib/systemd/system/fp6-vendor-blobs.service
+	# enabled unconditionally: the unit is a fast no-op once every manifest
+	# dest exists, and blobs appearing on first boot must not depend on a
+	# manual systemctl enable
+	mkdir -p "$pkgdir"/etc/systemd/system/multi-user.target.wants
+	ln -s /usr/lib/systemd/system/fp6-vendor-blobs.service \
+		"$pkgdir"/etc/systemd/system/multi-user.target.wants/fp6-vendor-blobs.service
+	mkdir -p "$pkgdir"/usr/share/fp6-vendor-blobs/manifest.d
+}
+
+sha512sums="
+a71b2c86f980734d0aae6e135b26272fe52ae5603050bea52f55f7e74c8bd98c62b6194047711248d4fef40851792adc47d77c40016d99a0d68ecd2459894b80  fp6-vendor-blobs-extract
+e2c03e5016f1848c57e6160ce432530b181ff5d34a5aaf1822f0ffa5fe71d16691657ada4a5789c4d4209e14e83f43aab072d01f644b07b93648f91e2a7bb0ca  fp6-vendor-blobs.service
+"

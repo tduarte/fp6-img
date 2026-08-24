@@ -1,0 +1,15 @@
+[Unit]
+Description=Extract vendor blobs from the stock Android partitions
+# The dynamic-partition mappings come from the initramfs and the dests live
+# on the rootfs, so local-fs ordering is enough. Deliberately not ordered
+# against driver/audio bringup: the extractor re-probes consumers itself
+# (manifest rebind lines), so it never has to win a race.
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/fp6-vendor-blobs/extract
+
+[Install]
+WantedBy=multi-user.target

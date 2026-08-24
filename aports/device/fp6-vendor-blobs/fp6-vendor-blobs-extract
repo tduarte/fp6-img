@@ -1,0 +1,190 @@
+#!/bin/sh -u
+# fp6-vendor-blobs-extract - copy proprietary blobs out of the stock Android
+# partitions instead of distributing them. pmOS installs flash only
+# boot+userdata, so every installed FP6 still carries the stock vendor/dsp
+# partitions: the device duplicates files it already contains, for its own
+# operation - nothing is distributed by us or anyone else. Design, legal
+# frame and on-phone verification: fp6 repo journal/blobs/.
+#
+# Manifest fragments: /usr/share/fp6-vendor-blobs/manifest.d/*.manifest,
+# processed in sorted order; '#' comments and blank lines ignored:
+#
+#   file <partition[,partition...]> <path-in-partition> <dest> <sha256>
+#   rebind <bus> <device>
+#
+# file: mount the first available listed partition READ-ONLY (ext4 also
+#   gets -o noload - never a byte written to the stock partitions, not
+#   even a journal replay), copy <path-in-partition> to <dest>, verify the
+#   sha256. A missing source or a hash mismatch tries the next listed
+#   partition; no verified copy on any of them fails the run loudly - an
+#   unverified blob is never installed and a missing one never silently
+#   skipped. Dests that already exist are left alone (no hashing: a
+#   deliberately replaced file stays).
+# rebind: if this fragment's run extracted at least one file, unbind and
+#   re-probe <device> on <bus> so the consuming driver picks the file up
+#   in the same boot. Unconditional on purpose: a still-bound consumer may
+#   have already failed a deferred firmware request that is never retried
+#   (aw88261 binds on i2c probe but requests the ACF only at card init),
+#   so only a fresh probe with the file present is a known-good state.
+#   All of a fragment's devices are unbound first, then re-probed, so a
+#   shared sound card re-forms once instead of bouncing per device.
+#
+# Partitions resolve via /dev/mapper (the pmOS initramfs maps the dynamic
+# partitions in super on every boot), then /dev/disk/by-partlabel (raw
+# partitions like dsp_a), then one make-dynpart-mappings fallback run;
+# mappings that run creates are removed again at the end.
+#
+# --if-device: exit 0 quietly when no stock super partition is visible
+#   (apk post-install scripts run inside build/CI chroots too; on images
+#   built there the first-boot service does the real extraction).
+
+MANIFEST_DIR=/usr/share/fp6-vendor-blobs/manifest.d
+SUPER=/dev/disk/by-partlabel/super
+MNT=
+MNT_PART=
+CREATED=
+TRIED_MAPPING=
+
+log() { echo "fp6-vendor-blobs: $*"; }
+
+unmount_cur() {
+	if [ -n "$MNT" ]; then
+		umount "$MNT" 2>/dev/null
+		rmdir "$MNT" 2>/dev/null
+		MNT= MNT_PART=
+	fi
+}
+
+cleanup() {
+	unmount_cur
+	for name in $CREATED; do
+		dmsetup remove "$name" 2>/dev/null || true
+	done
+	CREATED=
+}
+
+fail() {
+	echo "fp6-vendor-blobs: ERROR: $*" >&2
+	cleanup
+	exit 1
+}
+
+# resolve a partition name to a block device
+part_dev() {
+	[ -b "/dev/mapper/$1" ] && { echo "/dev/mapper/$1"; return 0; }
+	[ -b "/dev/disk/by-partlabel/$1" ] && { echo "/dev/disk/by-partlabel/$1"; return 0; }
+	if [ -z "$TRIED_MAPPING" ] && [ -b "$SUPER" ]; then
+		TRIED_MAPPING=1
+		before=$(dmsetup ls 2>/dev/null | awk '{print $1}')
+		make-dynpart-mappings "$SUPER" 0 2>/dev/null
+		after=$(dmsetup ls 2>/dev/null | awk '{print $1}')
+		for name in $after; do
+			case " $before " in *" $name "*) ;; *) CREATED="$CREATED $name" ;; esac
+		done
+		[ -n "$CREATED" ] && log "mapped dynamic partitions:$CREATED"
+		[ -b "/dev/mapper/$1" ] && { echo "/dev/mapper/$1"; return 0; }
+	fi
+	return 1
+}
+
+mount_part() {
+	[ "$MNT_PART" = "$1" ] && return 0
+	unmount_cur
+	dev=$(part_dev "$1") || return 1
+	dir=$(mktemp -d /run/fp6-vendor-blobs.XXXXXX) || fail "mktemp failed"
+	# noload succeeds on any ext4 and correctly fails on non-ext4, where
+	# plain ro cannot write anyway (erofs); a dirty ext4 is never replayed
+	if ! mount -o ro,noload "$dev" "$dir" 2>/dev/null && \
+	   ! mount -o ro "$dev" "$dir" 2>/dev/null; then
+		rmdir "$dir" 2>/dev/null
+		return 1
+	fi
+	MNT=$dir
+	MNT_PART=$1
+}
+
+extract() { # <partition,...> <path-in-partition> <dest> <sha256>
+	parts=$1 src=$2 dest=$3 want=$4
+	for part in $(echo "$parts" | tr ',' ' '); do
+		mount_part "$part" || { log "$part: not mountable, trying next"; continue; }
+		[ -f "$MNT/$src" ] || { log "$part: no $src, trying next"; continue; }
+		tmp="$dest.fp6-extract.$$"
+		mkdir -p "${dest%/*}" || fail "cannot create ${dest%/*}"
+		cp "$MNT/$src" "$tmp" || { rm -f "$tmp"; fail "copying $part:$src failed"; }
+		got=$(sha256sum "$tmp" | awk '{print $1}')
+		if [ "$got" != "$want" ]; then
+			rm -f "$tmp"
+			log "$part:$src sha256 $got != expected, trying next"
+			continue
+		fi
+		chmod 644 "$tmp" && mv "$tmp" "$dest" || { rm -f "$tmp"; fail "installing $dest failed"; }
+		log "extracted $part:$src -> $dest"
+		return 0
+	done
+	fail "no listed partition ($parts) yields $src with sha256 $want - $dest NOT installed"
+}
+
+rebind_all() { # <bus/device ...>
+	for rb in $1; do
+		bus=${rb%%/*} dev=${rb#*/}
+		[ -e "/sys/bus/$bus/devices/$dev/driver" ] || continue
+		if echo "$dev" > "/sys/bus/$bus/devices/$dev/driver/unbind" 2>/dev/null; then
+			log "unbound $bus $dev"
+		fi
+	done
+	for rb in $1; do
+		bus=${rb%%/*} dev=${rb#*/}
+		if [ ! -e "/sys/bus/$bus/devices/$dev" ]; then
+			log "rebind: no $dev on bus $bus (yet) - its driver will probe on its own"
+		elif echo "$dev" > "/sys/bus/$bus/drivers_probe" 2>/dev/null; then
+			log "re-probed $bus $dev"
+		else
+			log "rebind: drivers_probe of $dev failed (driver not loaded yet?)"
+		fi
+	done
+}
+
+if [ "${1:-}" = --if-device ] && [ ! -b "$SUPER" ]; then
+	log "no stock super partition visible (build chroot?), nothing to do"
+	exit 0
+fi
+
+[ -d "$MANIFEST_DIR" ] || exit 0
+
+# fast path for every boot after the first: all dests already present
+missing=
+for f in "$MANIFEST_DIR"/*.manifest; do
+	[ -e "$f" ] || continue
+	while read -r kind _ _ dest _; do
+		[ "$kind" = file ] && [ ! -e "$dest" ] && missing=1
+	done < "$f"
+done
+[ -z "$missing" ] && exit 0
+
+for f in "$MANIFEST_DIR"/*.manifest; do
+	[ -e "$f" ] || continue
+	extracted=
+	rebinds=
+	while read -r kind a b c d; do
+		case "$kind" in
+		''|'#'*) ;;
+		file)
+			[ -n "$d" ] || fail "$f: malformed file line"
+			[ -e "$c" ] && continue
+			extract "$a" "$b" "$c" "$d" </dev/null
+			extracted=1
+			;;
+		rebind)
+			[ -n "$b" ] || fail "$f: malformed rebind line"
+			rebinds="$rebinds $a/$b"
+			;;
+		*) fail "$f: unknown directive '$kind'" ;;
+		esac
+	done < "$f"
+	if [ -n "$extracted" ] && [ -n "$rebinds" ]; then
+		rebind_all "$rebinds" </dev/null
+	fi
+done
+
+cleanup
+exit 0

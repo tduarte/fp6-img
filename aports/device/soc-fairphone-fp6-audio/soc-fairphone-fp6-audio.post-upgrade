@@ -1,0 +1,6 @@
+#!/bin/sh
+# aw88261_acf.bin is not shipped - extract it from the stock vendor
+# partition right away rather than at the next boot. --if-device makes
+# this a quiet no-op inside build/CI chroots (the image's first boot
+# runs fp6-vendor-blobs.service instead).
+exec /usr/lib/fp6-vendor-blobs/extract --if-device

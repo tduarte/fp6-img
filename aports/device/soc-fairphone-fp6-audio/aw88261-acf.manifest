@@ -1,0 +1,10 @@
+# AW88261 smart-amp config blob (proprietary, Awinic) - extracted from the
+# stock vendor partition on-device instead of being shipped (fp6 repo
+# journal/blobs/, 2026-08-24). Slot A first, slot B as fallback; the copy
+# must hash-match the blob the audio stack was tested with.
+file vendor_a,vendor_b firmware/aw882xx_acf.bin /usr/lib/firmware/qcom/milos/fairphone/fp6/aw88261_acf.bin af723973655ba5901948d4a22212323e39ce53ff0156021185720af4af6ab0b3
+# the amps bind on i2c probe but request the ACF only at card init, which
+# races the extractor on first boot and is never retried on failure - a
+# forced fresh probe of both amps makes audio work that same boot either way
+rebind i2c 6-0034
+rebind i2c 6-0035

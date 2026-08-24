@@ -129,6 +129,7 @@ rm -rf "$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos" \
 mkdir -p "$WORK/pmaports/temp"
 cp -r aports/device/linux-postmarketos-qcom-milos "$WORK/pmaports/device/testing/"
 cp -r aports/device/soc-fairphone-fp6-audio "$WORK/pmaports/device/"
+cp -r aports/device/fp6-vendor-blobs "$WORK/pmaports/device/"
 cp -r aports/device/callaudioshim "$WORK/pmaports/device/"
 cp -r aports/device/fp6-device-tweaks "$WORK/pmaports/device/"
 cp -r aports/device/fp6-charging-mode "$WORK/pmaports/device/"
