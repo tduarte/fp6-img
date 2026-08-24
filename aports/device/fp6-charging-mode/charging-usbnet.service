@@ -1,0 +1,9 @@
+[Unit]
+Description=Static USB gadget network for charging mode
+# Only ever pulled by charging.target — replaces NetworkManager's
+# "Developer Mode" profile there so no wifi stack starts in charging mode.
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/charging-mode/charging-usbnet.sh

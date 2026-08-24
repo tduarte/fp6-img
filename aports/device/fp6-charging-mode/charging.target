@@ -1,0 +1,26 @@
+# Offline charging mode: minimal boot target for charger-triggered boots.
+# Reached only via charging-mode-generator (never enabled, never the static
+# default). basic.target gives us udev coldplug -> qcom_q6v5_pas module ->
+# ADSP boot -> pmic_glink/battmgr (all builtin), i.e. battery telemetry and
+# the ADSP-owned charging state machine, with no UI stack and no greeter.
+#
+# systemd-logind handles the power key (generator drops HandlePowerKey=reboot
+# into /run for this boot only).
+
+[Unit]
+Description=Offline charging mode
+Requires=basic.target
+After=basic.target rescue.service rescue.target
+Conflicts=rescue.service rescue.target
+Wants=charging-monitor.service systemd-logind.service
+AllowIsolate=yes
+
+# Observability (r3): ssh is OFF by default — volume-down enables it
+# (charging-keys starts systemd-user-sessions + charging-usbnet + sshd, USB
+# cable only, no NetworkManager/wifi ever). systemd-user-sessions is needed
+# at that moment because we bypass multi-user.target and sshd would
+# otherwise refuse unprivileged logins via pam_nologin.
+# Radios/sensors are kept out via ConditionPathExists drop-ins on
+# bluetooth/iio-sensor-proxy/hkdm (marker: /run/charging-mode) and the
+# monitor stops the modem + cdsp remoteprocs.
+Wants=charging-keys.service

@@ -1,0 +1,9 @@
+[Unit]
+Description=Offline charging monitor
+After=basic.target
+
+[Service]
+Type=exec
+ExecStart=/usr/lib/charging-mode/charging-monitor.sh
+Restart=on-failure
+RestartSec=5

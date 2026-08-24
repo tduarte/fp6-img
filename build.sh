@@ -118,6 +118,7 @@ cp -r aports/device/linux-postmarketos-qcom-milos "$WORK/pmaports/device/testing
 cp -r aports/device/soc-fairphone-fp6-audio "$WORK/pmaports/device/"
 cp -r aports/device/callaudioshim "$WORK/pmaports/device/"
 cp -r aports/device/fp6-device-tweaks "$WORK/pmaports/device/"
+cp -r aports/device/fp6-charging-mode "$WORK/pmaports/device/"
 cp -r aports/device/catcrafts-fp6-repo "$WORK/pmaports/device/"
 cp -r aports/main/postmarketos-config-nftables "$WORK/pmaports/main/"
 cp -r aports/modem/imsd "$WORK/pmaports/modem/"
@@ -200,7 +201,7 @@ aports = $WORK/pmaports
 device = fairphone-fp6
 ui = plasma-mobile
 systemd = always
-extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fp6-device-tweaks,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel
+extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fp6-device-tweaks,fp6-charging-mode,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel
 EOF
 
 # All five source tarballs are generated locally above, so every checksum

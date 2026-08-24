@@ -1,0 +1,41 @@
+#!/bin/sh
+# systemd system generator: divert a charger-triggered boot to charging.target.
+#
+# The FP6 ABL appends "androidboot.mode=charger" to the kernel cmdline when
+# the PMIC PON reason is a charger insertion (confirmed on-device 2026-08-24,
+# journal/power). On such boots we swap the default target for the minimal
+# charging.target instead of booting to the full UI.
+#
+# This must NEVER break a normal boot: every failure path falls through to
+# exit 0 and the stock default.target.
+#
+# Escape hatch: /etc/charging-mode/disable — while it exists this generator
+# is inert (deploy.sh creates it; arming = removing it).
+#
+# The CHARGING_MODE_* env overrides exist only for side-effect-free dry-runs
+# on a live system; systemd invokes generators with a clean environment.
+
+[ -e "${CHARGING_MODE_DISABLE_FILE:-/etc/charging-mode/disable}" ] && exit 0
+
+grep -Eq '(^| )androidboot\.mode=charger( |$)' /proc/cmdline || exit 0
+
+# $2 = early generator dir (highest priority in the unit search path that a
+# generator can write to — beats /etc/systemd/system). Old single-arg
+# invocation falls back to $1.
+EARLY_DIR="${2:-$1}"
+[ -n "$EARLY_DIR" ] && [ -d "$EARLY_DIR" ] || exit 0
+
+ln -sf /etc/systemd/system/charging.target "$EARLY_DIR/default.target" || exit 0
+
+# Marker for the ConditionPathExists=!/run/charging-mode drop-ins that keep
+# radios/sensors (bluetooth, iio-sensor-proxy, hkdm) out of charging mode.
+# Only created after the default.target diversion succeeded, so the
+# suppressions can never leak into a normal boot.
+: > "${CHARGING_MODE_MARKER:-/run/charging-mode}" 2>/dev/null
+
+# Power key exits charging mode via reboot: a warm reboot PONs as HARD_RESET,
+# so ABL does not re-append mode=charger and the next boot is a normal boot.
+LOGIND_DIR="${CHARGING_MODE_LOGIND_DIR:-/run/systemd/logind.conf.d}"
+mkdir -p "$LOGIND_DIR" 2>/dev/null && printf '[Login]\nHandlePowerKey=reboot\nHandlePowerKeyLongPress=reboot\n' > "$LOGIND_DIR/10-charging-mode.conf"
+
+exit 0

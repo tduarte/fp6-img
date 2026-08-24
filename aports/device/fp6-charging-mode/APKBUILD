@@ -1,0 +1,91 @@
+# Offline charging mode for the FP6 (Android-style charger boot), built
+# 2026-08-24 — source of truth + design + test evidence: fp6 repo
+# work/charging-mode/ and journal/power/.
+#
+# The FP6 ABL appends androidboot.mode=charger when a charger insertion
+# powers the phone on. Without this package, that boot goes all the way to
+# the full UI and at low battery sags back into shutdown — the dead-battery
+# bootloop. With it, a systemd generator diverts charger boots to a minimal
+# charging.target: ADSP-owned charging runs (incl. USB-PD), panel dark
+# (splash killed ~6-10 s in via the initramfs hook), modem/cdsp remoteprocs
+# stopped, radios/sensors suppressed, CPU capped. Verified net >= breakeven
+# even on a 100 mA-classified workstation USB port; strongly positive on
+# real chargers.
+#
+# User interactions in charging mode:
+#   power key    reboot into a normal boot (warm reboot drops the ABL flag)
+#   volume-up    toggle on-screen battery status (%/rate/input/ETA)
+#   volume-down  enable ssh over the USB cable (debug; static 172.16.42.1)
+#   unplug       orderly poweroff
+#
+# Suspend duty-cycling exists behind /etc/charging-mode/enable-suspend but
+# is NOT shipped enabled: resume from deep suspend intermittently kills the
+# UFS link (tracked in journal/power, track 3). Do not enable until fixed.
+# Escape hatch: touch /etc/charging-mode/disable to make the generator
+# inert. Units install under /etc/systemd/system (same paths the dev phone
+# runs, byte-identical to the tested deployment).
+maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
+pkgname=fp6-charging-mode
+pkgver=1
+pkgrel=0
+pkgdesc="Fairphone 6 offline charging mode (charger-boot detection + minimal charging target)"
+url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
+arch="noarch"
+license="MIT"
+options="!check"
+source="
+	charging-mode-generator
+	charging.target
+	charging-monitor.service
+	charging-monitor.sh
+	charging-usbnet.service
+	charging-usbnet.sh
+	charging-keys.service
+	charging-keys.sh
+	charging-mode-suppress.conf
+	charging-mode-initfs-hook.sh
+"
+
+package() {
+	install -Dm755 "$srcdir"/charging-mode-generator \
+		"$pkgdir"/usr/lib/systemd/system-generators/charging-mode-generator
+	install -Dm644 "$srcdir"/charging.target \
+		"$pkgdir"/etc/systemd/system/charging.target
+	install -Dm644 "$srcdir"/charging-monitor.service \
+		"$pkgdir"/etc/systemd/system/charging-monitor.service
+	install -Dm755 "$srcdir"/charging-monitor.sh \
+		"$pkgdir"/usr/lib/charging-mode/charging-monitor.sh
+	install -Dm644 "$srcdir"/charging-usbnet.service \
+		"$pkgdir"/etc/systemd/system/charging-usbnet.service
+	install -Dm755 "$srcdir"/charging-usbnet.sh \
+		"$pkgdir"/usr/lib/charging-mode/charging-usbnet.sh
+	install -Dm644 "$srcdir"/charging-keys.service \
+		"$pkgdir"/etc/systemd/system/charging-keys.service
+	install -Dm755 "$srcdir"/charging-keys.sh \
+		"$pkgdir"/usr/lib/charging-mode/charging-keys.sh
+	# radios/sensors out of charging mode: conditional drop-ins, inert in
+	# normal boots (the generator creates the /run/charging-mode marker
+	# only on charger boots). Drop-ins for units a variant image may not
+	# ship are harmless.
+	for u in bluetooth iio-sensor-proxy hkdm; do
+		install -Dm644 "$srcdir"/charging-mode-suppress.conf \
+			"$pkgdir"/etc/systemd/system/$u.service.d/zz-charging-mode.conf
+	done
+	# early splash/panel kill — lands in the initramfs via the
+	# postmarketos-initramfs trigger on /usr/share/mkinitfs
+	install -Dm755 "$srcdir"/charging-mode-initfs-hook.sh \
+		"$pkgdir"/usr/share/mkinitfs/hooks/20-charging-mode.sh
+}
+
+sha512sums="
+28027696cb1f5d2b1f5d1e09d7f381e89c223b7f10e54f7f8f6e1d75de2b0640b4db81a14263deda69c9c1d992614df0449f9078fec654e56c67c659649301c6  charging-mode-generator
+e0640c43c7900269000fb0854f8a113258572ee35d6072e96c5e919329a785de9a17308002099343046d2c5657638780708c34728d1445f82a27505e329fd55a  charging.target
+1b330faa2dbd9e4d1505f58db7883f52de656c51aac93012c3e91aed7797fccada9eb67b116a9d932754588475e282fa6fb57287bb6681431e50b4a51aa7003a  charging-monitor.service
+d05b1a5e3a13de4cfa0d09fb87842da740d13d4f557894adab4d9f0d9d3ea47d61d17fd75beee3fddf2297a64b7d9d0e0ebdefa76952df4445daf169946428e5  charging-monitor.sh
+504c9cf3bb0d511851bc82ae5cf715b9be6c289ff9611c7387b787d68404254a702af1fc705376f6e72314bf17094acb61a5d66279a3bcc5fbda2f2e9d1f2454  charging-usbnet.service
+89f3cd78969787cfccc4da26dadacc395d51f5d2e0f4e9565988eb4a34bb98c2b3ca55550d21229e43bc1abe0191394ea0c9b0b68f7f39f5dc1a5e05ca8340e7  charging-usbnet.sh
+24cda032576251a7ac2ebc67a4bb1e40b8e245a6280cba083a7d8a2b76513fbb728f1f78ad62fc95f77b12880c80d963226b9ffc049997487e4fd7619b7dc8a4  charging-keys.service
+8905a1dfb7a73a846fe6b9f4c530a28b326dded44e992c4f6ca1976250b966f231d67639190570a055628f01637debd951dfb7bf937640364424ed97afe517e2  charging-keys.sh
+127cbcd35a581c048eb9e9c31df9044a3a62c3223914032f413e58da58422c3871faa09b4ac5ecd8f4237b33a448c43a91b181830faa62eb753d7111d1efa66b  charging-mode-suppress.conf
+1e9ab3c137cda062de1cbb7eea59677337a6b59eeed7e7f74bc7826146af8c6d26e0ac394984d4ccec3b0a1017f196f09f3fdba1728218e3c28022892c06685d  charging-mode-initfs-hook.sh
+"

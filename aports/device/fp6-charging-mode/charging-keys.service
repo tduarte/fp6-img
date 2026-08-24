@@ -1,0 +1,9 @@
+[Unit]
+Description=Charging-mode key handler (volume-down enables ssh)
+# Only ever pulled by charging.target.
+
+[Service]
+Type=exec
+ExecStart=/usr/lib/charging-mode/charging-keys.sh
+Restart=on-failure
+RestartSec=5
