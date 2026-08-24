@@ -36,8 +36,20 @@ if [ "$(id -u)" = 0 ]; then
 	# (pmbootstrap's host-tool checks + image mounting need both)
 	apk add -q git sudo openssl python3 py3-pip multipath-tools util-linux \
 		tar xz
-	pip install -q --break-system-packages \
-		git+https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git@3.11.1
+	# the pmOS gitlab hiccups under crawler load and truncates clones
+	# ("early EOF"); that should cost a retry, not the run — same reasoning
+	# as clone_retry below, which isn't defined yet in this root branch
+	for _i in 1 2 3; do
+		pip install -q --break-system-packages \
+			git+https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git@3.11.1 \
+			&& break
+		if [ "$_i" = 3 ]; then
+			echo "pmbootstrap pip install failed after 3 attempts" >&2
+			exit 1
+		fi
+		echo "pmbootstrap pip install failed (attempt $_i/3), retrying in 15s..." >&2
+		sleep 15
+	done
 	# The container cannot modprobe (no /lib/modules in here), but it doesn't
 	# need to: the host kernel autoloads the loop driver when losetup opens
 	# the static /dev/loop-control node. Make pmbootstrap's explicit
