@@ -72,7 +72,8 @@ if [ "$(id -u)" = 0 ]; then
 	# would poison the next podman invocation's cwd)
 	install -d -o build dist
 	find dist -mindepth 1 -delete
-	exec su build -c "sh -eu '$PWD/build.sh'"
+	# su scrubs the environment — carry the knobs that matter across it
+	exec su build -c "FP6IMG_NO_CROSSDIRECT='${FP6IMG_NO_CROSSDIRECT:-}' sh -eu '$PWD/build.sh'"
 fi
 
 # git hosts occasionally hiccup (our forgejo lives on a small VM that also
