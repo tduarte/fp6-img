@@ -226,16 +226,29 @@ pmbootstrap checksum libqmi
 pmbootstrap checksum modemmanager
 pmbootstrap checksum libcamera
 
+# FP6IMG_NO_CROSSDIRECT=1: for local (podman) environments where
+# crossdirect's /native bridge breaks ("cc: cannot execute cc1:
+# posix_spawnp: No such file or directory" during meson setup); the
+# affected packages then build qemu-only — slower, identical output. The
+# kernel is unaffected either way (cross-native, no crossdirect).
+NOCROSS=${FP6IMG_NO_CROSSDIRECT:+--no-cross}
+
 # pmbootstrap's install-time build plan is not dependency-ordered (it tried
 # building modemmanager before the libqmi its makedepends require); build
 # the GNSS stack bottom-up explicitly. 'pmbootstrap build' is a no-op when
 # the package is already current.
-retry "build libqmi" pmbootstrap build --arch aarch64 libqmi
-retry "build modemmanager" pmbootstrap build --arch aarch64 modemmanager
+retry "build libqmi" pmbootstrap $NOCROSS build --arch aarch64 libqmi
+retry "build modemmanager" pmbootstrap $NOCROSS build --arch aarch64 modemmanager
 # libcamera is no makedepend of anything here - build it explicitly so the
 # patched -r2 exists for the publish step even if the install set resolves
 # it before the overlay is considered.
-retry "build libcamera" pmbootstrap build --arch aarch64 libcamera
+retry "build libcamera" pmbootstrap $NOCROSS build --arch aarch64 libcamera
+# imsd is the one crossdirect build left to the install phase, which has no
+# per-package flag — pre-build it here in no-crossdirect mode so install
+# finds it current.
+if [ -n "$NOCROSS" ]; then
+	retry "build imsd" pmbootstrap $NOCROSS build --arch aarch64 imsd
+fi
 
 # --- 4. build the image -------------------------------------------------------
 # Same default credentials as the official postmarketOS images.
