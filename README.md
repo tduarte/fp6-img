@@ -14,10 +14,7 @@ Maintained by [Jorijn van der Graaf](https://catcrafts.net/about)
 
 Everything on the `combined-stable` branch: display, touch, wifi, cellular
 data, NFC (reader), speaker audio, microphone, IMU, magnetometer, barometer,
-ambient light/proximity — plus VoLTE calls (both directions) through imsd.
-
-Verified on exactly one device / one carrier (KPN NL). Reports from other
-carriers are very welcome.
+ambient light/proximity plus VoLTE calls (both directions) through imsd.
 
 ## Flashing
 
@@ -53,22 +50,3 @@ Find it in a stock-firmware capture or your carrier's IMS documentation, then
 file to exist). See the
 [imsd README](https://forgejo.catcrafts.net/Catcrafts/imsd) for the full
 variable reference and carrier assumptions.
-
-## How it builds
-
-`build.sh` drives [pmbootstrap](https://gitlab.postmarketos.org/postmarketOS/pmbootstrap)
-with the `aports/` overlay in this repository:
-
-- `device/linux-postmarketos-qcom-milos` — the pmaports kernel aport,
-  repointed at `combined-stable` with the exact kernel config the development FP6 runs.
-- `modem/imsd` — imsd, packaged from source. Its `provides=81voltd` keeps the
-  conflicting modem-firmware IMS helper off the image (two IMS stacks cannot
-  share one PDN).
-- `main/postmarketos-config-nftables` — adds the `-imsd` subpackage accepting
-  imsd's IPsec-protected SIP ports on the IMS PDN (auto-installed alongside
-  imsd).
-- `device/catcrafts-fp6-repo` — subscribes the installed system to the
-  [Catcrafts apk registry](https://forgejo.catcrafts.net/Catcrafts/-/packages)
-  (signing key + `/etc/apk/repositories` entry). CI publishes every built
-  package there, so `apk upgrade` delivers kernel/imsd/GNSS updates between
-  image releases.
