@@ -76,10 +76,15 @@ say "waiting for the phone to come up on the USB network ($PHONE)"
 # machine's side of the USB link: the gadget shows up as a new network
 # interface here, and either nothing configures an address on it, or a
 # network manager grabs it with the wrong profile (we have seen
-# NetworkManager hand it an unrelated LAN address). The phone runs a DHCP
-# server on the link, but host managers don't always ask.
+# NetworkManager hand it an unrelated LAN address). Whether the host gets
+# an address automatically depends on its network manager - don't count
+# on it.
+# The probe must be ssh-keyscan, not bash's /dev/tcp: this script runs
+# under /bin/sh, which is dash on Debian, where /dev/tcp is a literal
+# nonexistent path and the loop never succeeds (field report, 2026-08-28).
+# ssh-keyscan ships with the ssh client we already require.
 i=0
-until (exec 3<>"/dev/tcp/$PHONE/22") 2>/dev/null; do
+until ssh-keyscan -T 5 "$PHONE" >/dev/null 2>&1; do
 	i=$((i+1))
 	if [ $i -gt 40 ]; then
 		cat >&2 <<'EOF'
@@ -98,12 +103,14 @@ its side of the USB network link. Fix it by hand:
 
 If a network manager keeps reclaiming the interface, tell it to ignore it,
 e.g.: sudo nmcli device set <iface> managed no
+
+If ping 172.16.42.1 already works, this machine's side is fine - the phone's
+ssh service just isn't answering yet. Wait a minute and re-run.
 EOF
 		exit 1
 	fi
 	sleep 10
 done
-exec 3<&- 3>&- 2>/dev/null || true
 sleep 8
 
 # --- 4: write boot from Linux ---------------------------------------------------
