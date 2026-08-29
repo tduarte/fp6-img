@@ -14,13 +14,14 @@
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=fp6-vendor-blobs
 pkgver=1
-pkgrel=0
+pkgrel=1
 pkgdesc="On-device extraction of vendor blobs from the stock Android partitions"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
 arch="noarch"
 license="MIT"
 # fallback mapper for when the initramfs didn't map the dynamic partitions
 depends="make-dynpart-mappings"
+install="$pkgname.post-upgrade"
 options="!check"
 source="
 	fp6-vendor-blobs-extract
@@ -35,8 +36,12 @@ package() {
 		"$pkgdir"/usr/lib/systemd/system/fp6-vendor-blobs.service
 	# enabled unconditionally: the unit is a fast no-op once every manifest
 	# dest exists, and blobs appearing on first boot must not depend on a
-	# manual systemctl enable
-	mkdir -p "$pkgdir"/etc/systemd/system/multi-user.target.wants
+	# manual systemctl enable. sysinit = the real (pre-coldplug) run;
+	# multi-user = the post-udev retry if the early run failed (see unit)
+	mkdir -p "$pkgdir"/etc/systemd/system/sysinit.target.wants \
+		"$pkgdir"/etc/systemd/system/multi-user.target.wants
+	ln -s /usr/lib/systemd/system/fp6-vendor-blobs.service \
+		"$pkgdir"/etc/systemd/system/sysinit.target.wants/fp6-vendor-blobs.service
 	ln -s /usr/lib/systemd/system/fp6-vendor-blobs.service \
 		"$pkgdir"/etc/systemd/system/multi-user.target.wants/fp6-vendor-blobs.service
 	# ...and a preset, because the symlink alone does NOT survive: image
@@ -51,6 +56,6 @@ package() {
 
 sha512sums="
 a71b2c86f980734d0aae6e135b26272fe52ae5603050bea52f55f7e74c8bd98c62b6194047711248d4fef40851792adc47d77c40016d99a0d68ecd2459894b80  fp6-vendor-blobs-extract
-e2c03e5016f1848c57e6160ce432530b181ff5d34a5aaf1822f0ffa5fe71d16691657ada4a5789c4d4209e14e83f43aab072d01f644b07b93648f91e2a7bb0ca  fp6-vendor-blobs.service
+b4c290095d9f39515378dfef08de720ce49324210342aa13c131dfce1103785e796e6f821f0c659671a4c44b46f466ce0e03f11f216fdcdee2a99db5e7970800  fp6-vendor-blobs.service
 9e79dd0aed13f11a71282aa24b2a26331e85c105e25ab0c0fed6189b8c300769a5f4308b18b91d9855868d658ad3a57c03e26c9b11bd27fd5e03f9a5decbbd6a  fp6-vendor-blobs.preset
 "

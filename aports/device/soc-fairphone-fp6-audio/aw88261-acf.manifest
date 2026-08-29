@@ -3,8 +3,14 @@
 # journal/blobs/, 2026-08-24). Slot A first, slot B as fallback; the copy
 # must hash-match the blob the audio stack was tested with.
 file vendor_a,vendor_b firmware/aw882xx_acf.bin /usr/lib/firmware/qcom/milos/fairphone/fp6/aw88261_acf.bin af723973655ba5901948d4a22212323e39ce53ff0156021185720af4af6ab0b3
-# the amps bind on i2c probe but request the ACF only at card init, which
-# races the extractor on first boot and is never retried on failure - a
-# forced fresh probe of both amps makes audio work that same boot either way
+# Rebinds are the FALLBACK for a card that probed before extraction (the
+# service normally runs pre-coldplug, so they no-op). The amps bind on i2c
+# probe but request the ACF only at card init, never retried on failure; and
+# when that failed card init already took the machine driver down (-2, not a
+# defer), re-probing the amps alone cannot re-form the card - the platform
+# device needs a fresh probe too. Note the recovered card plays back fine
+# but its capture path is dead until the next boot (wcd9378 TX sequencer
+# refuses PS0 on a late-formed card - journal/blobs/ 2026-08-29).
 rebind i2c 6-0034
 rebind i2c 6-0035
+rebind platform sound

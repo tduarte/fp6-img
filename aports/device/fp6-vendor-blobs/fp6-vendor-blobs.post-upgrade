@@ -1,0 +1,10 @@
+#!/bin/sh
+# Re-apply the preset: images built before the preset file existed (the
+# 2026-08-24 image) shipped the unit `disabled; preset: disabled`, so an
+# upgrade must enable it or those installs never extract anything. Then
+# extract immediately rather than at the next boot (--if-device makes that
+# a quiet no-op inside build/CI chroots). A card that already hard-failed
+# this boot recovers playback via the manifest's rebind lines; capture
+# needs the next boot (journal/blobs/ 2026-08-29).
+systemctl preset fp6-vendor-blobs.service 2>/dev/null || :
+exec /usr/lib/fp6-vendor-blobs/extract --if-device

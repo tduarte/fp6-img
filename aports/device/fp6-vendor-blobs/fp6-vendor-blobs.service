@@ -1,10 +1,24 @@
 [Unit]
 Description=Extract vendor blobs from the stock Android partitions
-# The dynamic-partition mappings come from the initramfs and the dests live
-# on the rootfs, so local-fs ordering is enough. Deliberately not ordered
-# against driver/audio bringup: the extractor re-probes consumers itself
-# (manifest rebind lines), so it never has to win a race.
-After=local-fs.target
+# Must run BEFORE udev coldplug loads the consuming drivers: a sound card
+# that probes without its firmware hard-fails (-2, never retried), and while
+# a later re-probe of the machine driver re-forms the card, that late-formed
+# card has a dead capture path (wcd9378 TX sequencer refuses PS0 - fp6 repo
+# journal/blobs/ 2026-08-29). Only extraction-before-probe yields a fully
+# working card, so this runs pre-coldplug; the manifest rebind lines remain
+# as the fallback for consumers that probed anyway (playback recovers same
+# boot, capture needs the next boot) and for on-device re-extraction after a
+# package upgrade.
+# The dynamic-partition mappings come from the initramfs (device nodes exist
+# pre-udev) and the dests live on the rootfs, so remount-fs ordering is
+# enough. multi-user is a deliberate second Wants: if the early run failed
+# (e.g. no mappings pre-udev), the multi-user start job retries it after
+# udev, where the by-partlabel/make-dynpart-mappings fallbacks work.
+DefaultDependencies=no
+After=systemd-remount-fs.service
+Before=systemd-udev-trigger.service sysinit.target shutdown.target
+Conflicts=shutdown.target
+RequiresMountsFor=/usr/lib/firmware
 
 [Service]
 Type=oneshot
@@ -12,4 +26,4 @@ RemainAfterExit=yes
 ExecStart=/usr/lib/fp6-vendor-blobs/extract
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=sysinit.target multi-user.target

@@ -11,7 +11,7 @@
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=soc-fairphone-fp6-audio
 pkgver=4
-pkgrel=0
+pkgrel=1
 pkgdesc="Fairphone 6 audio topology and UCM profile"
 url="https://forgejo.catcrafts.net/Catcrafts/audioreach-topology"
 arch="noarch"
@@ -47,7 +47,7 @@ package() {
 
 sha512sums="
 51071c574b9f5899c78ba9fe1b6f3bbda2195e6d274014a05869ae56ed0ff18e15678bd7d78cd68846900d3c579556328e229842152cffd943186d43344ed33c  fp6-tplg.bin
-bdfe413494b6815cf96843d83c6c9e8deb757b083d7577c93eab460de49d1cd00b8615c115c25d71f6488de4e65f04d5f02bca816b2c31747880a22613e547a3  aw88261-acf.manifest
+0240a36e6fae76f6df576c5ffc93241f6d59e03db429811d61c746561743ddb4690cb925028546a6c3d69dcc867aead5ddf1c85b12a0065195ea9c6621fa847f  aw88261-acf.manifest
 3bb268f9fcb8d1c0b42741b67da42b6361bab259e7211d9930919995ebe7dcf67826e6d4f00ff5e4fe5b52067fe90d00212158c3b4879d1bee481e87f0623206  ucm-milos-fp6.conf
 2a189c3141fedc43f8eb19f4df1e43487223d524e27da3f948556d224cca1f493f6815ada191953fb79a19d5c5abadb21de7b3ece7b74b0929338c216e21e84a  HiFi.conf
 ec63fa5363738a43c9eee4b1be70201e2d2076ec817031fda087e61d781e81dc67351be44faf8b056a2939875a139cd909f7c311115bb1150e17ad4493846606  50-echo-cancel.conf
