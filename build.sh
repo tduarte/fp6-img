@@ -18,9 +18,12 @@ set -eu
 KERNEL_REPO=https://forgejo.catcrafts.net/Catcrafts/milos-linux.git
 KERNEL_BRANCH=combined-stable
 IMSD_REPO=https://forgejo.catcrafts.net/Catcrafts/imsd.git
-# imsd 0.3.0: what the dev phone runs (0.2.7) + emergency-calling stage 1 +
-# the make build path the aport needs. Bump deliberately, not via tip-chasing.
-IMSD_COMMIT=1037958
+# imsd 0.3.1: 0.3.0 + the ims-pdn-up hardening (mmcli errors logged
+# verbatim, registration gate, configurable ip-type) + README carrier
+# updates. The aport now lives IN the imsd repo (packaging/aport/,
+# transferred 2026-09-01) and is copied out of this checkout below.
+# Bump deliberately, not via tip-chasing.
+IMSD_COMMIT=17e0f6b
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
 cd "$(dirname "$0")"
@@ -135,7 +138,8 @@ cp -r aports/device/fp6-device-tweaks "$WORK/pmaports/device/"
 cp -r aports/device/fp6-charging-mode "$WORK/pmaports/device/"
 cp -r aports/device/catcrafts-fp6-repo "$WORK/pmaports/device/"
 cp -r aports/main/postmarketos-config-nftables "$WORK/pmaports/main/"
-cp -r aports/modem/imsd "$WORK/pmaports/modem/"
+# imsd's aport is NOT carried here: the imsd repo owns it (packaging/aport/)
+# and section 2 copies it out of the pinned checkout.
 # Alpine forks carrying the GNSS patches (libqmi !470 unreleased; MM !1463
 # draft) - deps of modemmanager/imsd, built from aports because r100 > repo.
 cp -r aports/temp/libqmi "$WORK/pmaports/temp/"
@@ -162,10 +166,16 @@ KDATE=$(git -C "$WORK/milos-src" log -1 --format=%cd --date=format:%Y%m%d)
 sed -i "s/^pkgver=\([0-9.]*\)\$/pkgver=\1_git$KDATE/" "$KAPORT/APKBUILD"
 
 # Same dance for imsd, pinned to a reviewed commit rather than branch tip.
+# The aport itself comes from the same pinned checkout (packaging/aport/,
+# owned by the imsd repo since 2026-09-01), so daemon and packaging can
+# never skew.
 
 clone_retry "$WORK/imsd-src" -q "$IMSD_REPO"
 git -C "$WORK/imsd-src" checkout -q "$IMSD_COMMIT"
 IAPORT="$WORK/pmaports/modem/imsd"
+mkdir -p "$WORK/pmaports/modem"
+rm -rf "$IAPORT"
+cp -r "$WORK/imsd-src/packaging/aport" "$IAPORT"
 git -C "$WORK/imsd-src" archive --prefix=imsd/ \
 	-o "$IAPORT/imsd-$IMSD_COMMIT.tar.gz" HEAD
 sed -i "s/^_commit=.*/_commit=\"$IMSD_COMMIT\"/" "$IAPORT/APKBUILD"
@@ -281,7 +291,7 @@ cp README.md install.sh "$STAGE/fp6-img/"
 	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
 	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "default login: user / 147147 (same as official postmarketOS images)"
-	echo "imsd:          $IMSD_REPO @ $IMSD_COMMIT (0.3.0)"
+	echo "imsd:          $IMSD_REPO @ $IMSD_COMMIT ($(apkbuild_var "$IAPORT" pkgver))"
 } > "$STAGE/fp6-img/build-info.txt"
 # sums of the extracted contents
 (cd "$STAGE/fp6-img" && sha256sum -- * > sha256sums.txt)
