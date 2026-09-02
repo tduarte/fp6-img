@@ -277,8 +277,20 @@ for _f in "$IMSD_DL"/*.apk; do
 	python3 ./apk-resign.py "$_f" "$KEYCOPY" "$(basename "$ABUILD_KEY").pub"
 done
 rm -f "$KEYCOPY"
-mkdir -p "$WORKDIR/packages/edge/aarch64"
-mv "$IMSD_DL"/*.apk "$WORKDIR/packages/edge/aarch64/"
+# The packages dir belongs to pmbootstrap's chroot user as well (abuild wrote
+# it from inside the chroot), so the build user cannot write there either
+# (run 50): install the files with the directory's own owner, as abuild would
+# have left them. The dir exists because the builds above populated it.
+PKGDIR="$WORKDIR/packages/edge/aarch64"
+if [ ! -d "$PKGDIR" ]; then
+	echo "$PKGDIR missing - the package builds above should have created it" >&2
+	exit 1
+fi
+for _f in "$IMSD_DL"/*.apk; do
+	sudo install -m 0644 -o "$(stat -c %u "$PKGDIR")" -g "$(stat -c %g "$PKGDIR")" \
+		"$_f" "$PKGDIR/$(basename "$_f")"
+done
+rm -f "$IMSD_DL"/*.apk
 pmbootstrap index
 
 # --- 4. build the image -------------------------------------------------------
