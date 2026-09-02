@@ -1,7 +1,7 @@
 #!/bin/sh -eu
 # fp6-img pipeline: build a flashable postmarketOS image for the Fairphone 6
-# with the Catcrafts kernel (milos-linux combined-stable) and, once its tag
-# is published, imsd (VoLTE).
+# with the Catcrafts kernel (milos-linux combined-stable) and imsd (VoLTE)
+# installed from the Catcrafts apk registry.
 #
 # Runs in CI inside an Alpine container on the privileged "pmos" runner
 # (pmbootstrap needs loop devices; the aarch64 chroots need the qemu-user
@@ -17,13 +17,19 @@ set -eu
 
 KERNEL_REPO=https://forgejo.catcrafts.net/Catcrafts/milos-linux.git
 KERNEL_BRANCH=combined-stable
-IMSD_REPO=https://forgejo.catcrafts.net/Catcrafts/imsd.git
-# imsd 0.3.1: 0.3.0 + the ims-pdn-up hardening (mmcli errors logged
-# verbatim, registration gate, configurable ip-type) + README carrier
-# updates. The aport now lives IN the imsd repo (packaging/aport/,
-# transferred 2026-09-01) and is copied out of this checkout below.
+# imsd is not built here: the image installs the apk the imsd repo's package
+# CI publishes to the registry (section 3b), so image and 'apk upgrade' carry
+# the same binary. Pinned by version AND by the sha256 of the registry files;
+# a bump is these lines (sha256sum the two apks under $IMSD_REGISTRY/aarch64/).
 # Bump deliberately, not via tip-chasing.
-IMSD_COMMIT=17e0f6b
+# 0.3.1: 0.3.0 + the ims-pdn-up hardening (mmcli errors logged verbatim,
+# registration gate, configurable ip-type) + README carrier updates.
+IMSD_REGISTRY=https://forgejo.catcrafts.net/api/packages/Catcrafts/alpine/edge/fp6
+IMSD_VERSION=0.3.1-r0
+IMSD_SHA256="
+f1c317d7ff9448c05df068d683d31da08e4bfc074704d96cf52cb8acbdee6304  imsd-0.3.1-r0.apk
+a78ef31fc2943ac02e120c46df26353d515ac9840d959cf5193b2afe1c665fa6  imsd-systemd-0.3.1-r0.apk
+"
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
 cd "$(dirname "$0")"
@@ -38,7 +44,7 @@ if [ "$(id -u)" = 0 ]; then
 	# multipath-tools: kpartx; util-linux: losetup with --json support
 	# (pmbootstrap's host-tool checks + image mounting need both)
 	apk add -q git sudo openssl python3 py3-pip multipath-tools util-linux \
-		tar xz
+		tar xz curl
 	# the pmOS gitlab hiccups under crawler load and truncates clones
 	# ("early EOF"); that should cost a retry, not the run — same reasoning
 	# as clone_retry below, which isn't defined yet in this root branch
@@ -138,8 +144,7 @@ cp -r aports/device/fp6-device-tweaks "$WORK/pmaports/device/"
 cp -r aports/device/fp6-charging-mode "$WORK/pmaports/device/"
 cp -r aports/device/catcrafts-fp6-repo "$WORK/pmaports/device/"
 cp -r aports/main/postmarketos-config-nftables "$WORK/pmaports/main/"
-# imsd's aport is NOT carried here: the imsd repo owns it (packaging/aport/)
-# and section 2 copies it out of the pinned checkout.
+# imsd has no aport here at all: section 3b installs the published apk.
 # Alpine forks carrying the GNSS patches (libqmi !470 unreleased; MM !1463
 # draft) - deps of modemmanager/imsd, built from aports because r100 > repo.
 cp -r aports/temp/libqmi "$WORK/pmaports/temp/"
@@ -165,22 +170,7 @@ sed -i "s/^_commit=.*/_commit=\"$COMMIT\"/" "$KAPORT/APKBUILD"
 KDATE=$(git -C "$WORK/milos-src" log -1 --format=%cd --date=format:%Y%m%d)
 sed -i "s/^pkgver=\([0-9.]*\)\$/pkgver=\1_git$KDATE/" "$KAPORT/APKBUILD"
 
-# Same dance for imsd, pinned to a reviewed commit rather than branch tip.
-# The aport itself comes from the same pinned checkout (packaging/aport/,
-# owned by the imsd repo since 2026-09-01), so daemon and packaging can
-# never skew.
-
-clone_retry "$WORK/imsd-src" -q "$IMSD_REPO"
-git -C "$WORK/imsd-src" checkout -q "$IMSD_COMMIT"
-IAPORT="$WORK/pmaports/modem/imsd"
-mkdir -p "$WORK/pmaports/modem"
-rm -rf "$IAPORT"
-cp -r "$WORK/imsd-src/packaging/aport" "$IAPORT"
-git -C "$WORK/imsd-src" archive --prefix=imsd/ \
-	-o "$IAPORT/imsd-$IMSD_COMMIT.tar.gz" HEAD
-sed -i "s/^_commit=.*/_commit=\"$IMSD_COMMIT\"/" "$IAPORT/APKBUILD"
-
-# Same again for the gitlab.freedesktop.org packages (libqmi, modemmanager,
+# Same dance for the gitlab.freedesktop.org packages (libqmi, modemmanager,
 # libcamera): their pinned tarballs came from fd.o's on-demand archive
 # endpoint, which 503/504s for hours at a stretch — runs #25, #27, #30 and
 # #31 all died there, outlasting any in-run retry. git clone is served from
@@ -228,12 +218,11 @@ systemd = always
 extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fp6-device-tweaks,fp6-charging-mode,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel
 EOF
 
-# All five source tarballs are generated locally above, so every checksum
+# All four source tarballs are generated locally above, so every checksum
 # step is offline. libcamera needs a checksum step now too: its committed
 # sums were for the fd.o-served tarball, and git-archive output is not
 # byte-identical to it (verified: sha512 differs).
 pmbootstrap checksum linux-postmarketos-qcom-milos
-pmbootstrap checksum imsd
 pmbootstrap checksum libqmi
 pmbootstrap checksum modemmanager
 pmbootstrap checksum libcamera
@@ -255,12 +244,36 @@ retry "build modemmanager" pmbootstrap $NOCROSS build --arch aarch64 modemmanage
 # patched -r2 exists for the publish step even if the install set resolves
 # it before the overlay is considered.
 retry "build libcamera" pmbootstrap $NOCROSS build --arch aarch64 libcamera
-# imsd is the one crossdirect build left to the install phase, which has no
-# per-package flag — pre-build it here in no-crossdirect mode so install
-# finds it current.
-if [ -n "$NOCROSS" ]; then
-	retry "build imsd" pmbootstrap $NOCROSS build --arch aarch64 imsd
+# --- 3b. imsd: the published apk, not a local build --------------------------
+# The imsd repo's package CI is the only producer of the imsd apk; the image
+# installs the exact registry package users later get via 'apk upgrade'.
+# pmbootstrap has no knob for a third-party repository, and after the main
+# 'apk add' it re-adds every package found in its local packages dir BY FILE
+# PATH — which makes apk verify the package's own signature, and registry
+# packages are signed with per-run keys nobody keeps (phones trust the
+# registry-signed index instead). So: fetch, check against the sha256 pin,
+# re-sign the envelope with this run's abuild key (control and data streams
+# stay byte-identical, so the identity checksum equals the registry's), drop
+# into the local packages dir, re-index. The abuild key exists because the
+# builds above initialized the buildroot.
+IMSD_DL="$WORK/imsd-apk"
+rm -rf "$IMSD_DL"
+mkdir -p "$IMSD_DL"
+for _f in "imsd-$IMSD_VERSION.apk" "imsd-systemd-$IMSD_VERSION.apk"; do
+	retry "fetch $_f" curl -fsSL -o "$IMSD_DL/$_f" "$IMSD_REGISTRY/aarch64/$_f"
+done
+(cd "$IMSD_DL" && printf '%s\n' "$IMSD_SHA256" | grep . | sha256sum -c -)
+ABUILD_KEY=$(echo "$WORKDIR"/config_abuild/*.rsa)
+if [ ! -f "$ABUILD_KEY" ]; then
+	echo "expected exactly one abuild key in $WORKDIR/config_abuild" >&2
+	exit 1
 fi
+for _f in "$IMSD_DL"/*.apk; do
+	python3 ./apk-resign.py "$_f" "$ABUILD_KEY" "$(basename "$ABUILD_KEY").pub"
+done
+mkdir -p "$WORKDIR/packages/edge/aarch64"
+mv "$IMSD_DL"/*.apk "$WORKDIR/packages/edge/aarch64/"
+pmbootstrap index
 
 # --- 4. build the image -------------------------------------------------------
 # Same default credentials as the official postmarketOS images.
@@ -291,7 +304,7 @@ cp README.md install.sh "$STAGE/fp6-img/"
 	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
 	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "default login: user / 147147 (same as official postmarketOS images)"
-	echo "imsd:          $IMSD_REPO @ $IMSD_COMMIT ($(apkbuild_var "$IAPORT" pkgver))"
+	echo "imsd:          $IMSD_REGISTRY imsd-$IMSD_VERSION (registry package, sha256-pinned)"
 } > "$STAGE/fp6-img/build-info.txt"
 # sums of the extracted contents
 (cd "$STAGE/fp6-img" && sha256sum -- * > sha256sums.txt)

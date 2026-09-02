@@ -44,12 +44,14 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-      # Ship every locally built apk (kernel, modemmanager, libqmi, imsd,
+      # Ship every locally built apk (kernel, modemmanager, libqmi,
       # callaudioshim, audio files, ...) to the Forgejo Alpine registry, so
       # installed systems get updates via 'apk upgrade' instead of losing
       # the FP6 patches to the next upstream version bump. Requires the
       # PACKAGE_TOKEN repo secret (catbot account, package:write scope);
       # skips quietly until it exists. 409 = same version already published.
+      # imsd is skipped: build.sh 3b took it FROM the registry (re-signed
+      # for the chroot), so it is not ours to publish.
       - name: Publish packages to the apk registry
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
@@ -62,6 +64,9 @@ jobs:
           found=0
           for f in /home/build/.local/var/pmbootstrap/packages/*/aarch64/*.apk; do
             [ -e "$f" ] || continue
+            case "$(basename "$f")" in
+              imsd-*) echo "registry-sourced, not republished: $(basename "$f")"; continue ;;
+            esac
             found=1
             code=$(curl -s -o /dev/null -w '%{http_code}' \
               --user "catbot:$PACKAGE_TOKEN" --upload-file "$f" \
