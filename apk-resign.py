@@ -11,6 +11,7 @@ This is what abuild-sign does to the control segment when abuild packages.
 """
 import gzip
 import io
+import os
 import subprocess
 import sys
 import tarfile
@@ -53,10 +54,17 @@ def main(path, privkey, pubname):
     kind = name.split(".")[2] if name.startswith(".SIGN.") else ""
     if kind not in DIGEST:
         sys.exit(f"{path}: unexpected signature entry {name!r}")
-    sig = subprocess.run(
-        ["openssl", "dgst", f"-{DIGEST[kind]}", "-sign", privkey],
-        input=control, capture_output=True, check=True,
-    ).stdout
+    if not os.access(privkey, os.R_OK):
+        sys.exit(f"{privkey}: not readable by uid {os.getuid()} (pmbootstrap's "
+                 "abuild-keygen runs as the chroot user, uid 12345, and leaves "
+                 "the key 0600 to it - sign from a readable copy)")
+    try:
+        sig = subprocess.run(
+            ["openssl", "dgst", f"-{DIGEST[kind]}", "-sign", privkey],
+            input=control, stdout=subprocess.PIPE, check=True,
+        ).stdout
+    except subprocess.CalledProcessError as e:
+        sys.exit(f"openssl dgst -sign exited {e.returncode} signing {path}")
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w", format=tarfile.USTAR_FORMAT) as tar:
         info = tarfile.TarInfo(f".SIGN.{kind}.{pubname}")

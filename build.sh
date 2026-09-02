@@ -268,9 +268,15 @@ if [ ! -f "$ABUILD_KEY" ]; then
 	echo "expected exactly one abuild key in $WORKDIR/config_abuild" >&2
 	exit 1
 fi
+# abuild-keygen ran inside the chroot as pmbootstrap's user (uid 12345), so
+# the key is 0600 to that uid and unreadable here (run 49 died on exactly
+# this); sign from a private copy taken via sudo, then drop it.
+KEYCOPY="$IMSD_DL/abuild-key.rsa"
+sudo install -m 0600 -o "$(id -un)" "$ABUILD_KEY" "$KEYCOPY"
 for _f in "$IMSD_DL"/*.apk; do
-	python3 ./apk-resign.py "$_f" "$ABUILD_KEY" "$(basename "$ABUILD_KEY").pub"
+	python3 ./apk-resign.py "$_f" "$KEYCOPY" "$(basename "$ABUILD_KEY").pub"
 done
+rm -f "$KEYCOPY"
 mkdir -p "$WORKDIR/packages/edge/aarch64"
 mv "$IMSD_DL"/*.apk "$WORKDIR/packages/edge/aarch64/"
 pmbootstrap index
