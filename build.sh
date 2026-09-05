@@ -1,6 +1,7 @@
 #!/bin/sh -eu
 # fp6-img pipeline: build a flashable postmarketOS image for the Fairphone 6
-# with the Catcrafts kernel (milos-linux combined-stable) and imsd (VoLTE)
+# with the Catcrafts kernel (milos-linux combined-stable), imsd (VoLTE) and
+# fingerprintd (fingerprint unlock)
 # installed from the Catcrafts apk registry.
 #
 # Runs in CI inside an Alpine container on the privileged "pmos" runner
@@ -29,6 +30,19 @@ IMSD_VERSION=0.3.1-r0
 IMSD_SHA256="
 f1c317d7ff9448c05df068d683d31da08e4bfc074704d96cf52cb8acbdee6304  imsd-0.3.1-r0.apk
 a78ef31fc2943ac02e120c46df26353d515ac9840d959cf5193b2afe1c665fa6  imsd-systemd-0.3.1-r0.apk
+"
+# fingerprintd (fingerprint unlock) comes from the same registry the same way:
+# its repo's package CI is the only producer, and the same pinning rule holds.
+# Three apks: the daemon, its systemd units, and the session agent (inert
+# until a user writes ~/.config/fingerprintd/fingers.conf). Needs the kernel
+# aport's CONFIG_QCOMTEE=m (pkgrel 101) and fp6-vendor-blobs >= 1-r2, both
+# built in this run. 0.2.3: 0.2.2 (enrol, unlock, agent, actions) + the
+# versioned blobs dependency + a post-upgrade daemon restart.
+FPD_VERSION=0.2.3-r0
+FPD_SHA256="
+3e28f0c1a9a844592ab6878b2dfc0d8f91674549e44bdc1652e7d7d029de1765  fingerprintd-0.2.3-r0.apk
+0cc46eba5c6c77d5bb54cd9f0e2902f7644720f9c98153062ffa33e19ca36889  fingerprintd-systemd-0.2.3-r0.apk
+6dfdbc6f971ba4b8f811f828e5868869c7d71fea6c7045e2bffd51bf2736c040  fingerprintd-agent-0.2.3-r0.apk
 "
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
@@ -215,7 +229,7 @@ aports = $WORK/pmaports
 device = fairphone-fp6
 ui = plasma-mobile
 systemd = always
-extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fp6-device-tweaks,fp6-charging-mode,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel
+extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fingerprintd,fingerprintd-systemd,fingerprintd-agent,fp6-device-tweaks,fp6-charging-mode,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel
 EOF
 
 # All four source tarballs are generated locally above, so every checksum
@@ -244,9 +258,9 @@ retry "build modemmanager" pmbootstrap $NOCROSS build --arch aarch64 modemmanage
 # patched -r2 exists for the publish step even if the install set resolves
 # it before the overlay is considered.
 retry "build libcamera" pmbootstrap $NOCROSS build --arch aarch64 libcamera
-# --- 3b. imsd: the published apk, not a local build --------------------------
-# The imsd repo's package CI is the only producer of the imsd apk; the image
-# installs the exact registry package users later get via 'apk upgrade'.
+# --- 3b. imsd + fingerprintd: the published apks, not local builds -----------
+# Each repo's package CI is the only producer of its apk; the image installs
+# the exact registry package users later get via 'apk upgrade'.
 # pmbootstrap has no knob for a third-party repository, and after the main
 # 'apk add' it re-adds every package found in its local packages dir BY FILE
 # PATH — which makes apk verify the package's own signature, and registry
@@ -256,13 +270,21 @@ retry "build libcamera" pmbootstrap $NOCROSS build --arch aarch64 libcamera
 # stay byte-identical, so the identity checksum equals the registry's), drop
 # into the local packages dir, re-index. The abuild key exists because the
 # builds above initialized the buildroot.
-IMSD_DL="$WORK/imsd-apk"
-rm -rf "$IMSD_DL"
-mkdir -p "$IMSD_DL"
-for _f in "imsd-$IMSD_VERSION.apk" "imsd-systemd-$IMSD_VERSION.apk"; do
-	retry "fetch $_f" curl -fsSL -o "$IMSD_DL/$_f" "$IMSD_REGISTRY/aarch64/$_f"
+REG_DL="$WORK/registry-apks"
+rm -rf "$REG_DL"
+mkdir -p "$REG_DL"
+for _f in "imsd-$IMSD_VERSION.apk" "imsd-systemd-$IMSD_VERSION.apk" \
+          "fingerprintd-$FPD_VERSION.apk" "fingerprintd-systemd-$FPD_VERSION.apk" \
+          "fingerprintd-agent-$FPD_VERSION.apk"; do
+	# every fetched file must have a pin: 'grep .' below drops empty lines,
+	# so an empty pin list would otherwise pass the check with nothing checked
+	printf '%s\n' "$IMSD_SHA256" "$FPD_SHA256" | grep -q "  $_f\$" || {
+		echo "no sha256 pin for $_f - add it to IMSD_SHA256/FPD_SHA256" >&2
+		exit 1
+	}
+	retry "fetch $_f" curl -fsSL -o "$REG_DL/$_f" "$IMSD_REGISTRY/aarch64/$_f"
 done
-(cd "$IMSD_DL" && printf '%s\n' "$IMSD_SHA256" | grep . | sha256sum -c -)
+(cd "$REG_DL" && printf '%s\n' "$IMSD_SHA256" "$FPD_SHA256" | grep . | sha256sum -c -)
 ABUILD_KEY=$(echo "$WORKDIR"/config_abuild/*.rsa)
 if [ ! -f "$ABUILD_KEY" ]; then
 	echo "expected exactly one abuild key in $WORKDIR/config_abuild" >&2
@@ -271,9 +293,9 @@ fi
 # abuild-keygen ran inside the chroot as pmbootstrap's user (uid 12345), so
 # the key is 0600 to that uid and unreadable here (run 49 died on exactly
 # this); sign from a private copy taken via sudo, then drop it.
-KEYCOPY="$IMSD_DL/abuild-key.rsa"
+KEYCOPY="$REG_DL/abuild-key.rsa"
 sudo install -m 0600 -o "$(id -un)" "$ABUILD_KEY" "$KEYCOPY"
-for _f in "$IMSD_DL"/*.apk; do
+for _f in "$REG_DL"/*.apk; do
 	python3 ./apk-resign.py "$_f" "$KEYCOPY" "$(basename "$ABUILD_KEY").pub"
 done
 rm -f "$KEYCOPY"
@@ -286,11 +308,11 @@ if [ ! -d "$PKGDIR" ]; then
 	echo "$PKGDIR missing - the package builds above should have created it" >&2
 	exit 1
 fi
-for _f in "$IMSD_DL"/*.apk; do
+for _f in "$REG_DL"/*.apk; do
 	sudo install -m 0644 -o "$(stat -c %u "$PKGDIR")" -g "$(stat -c %g "$PKGDIR")" \
 		"$_f" "$PKGDIR/$(basename "$_f")"
 done
-rm -f "$IMSD_DL"/*.apk
+rm -f "$REG_DL"/*.apk
 pmbootstrap index
 
 # --- 4. build the image -------------------------------------------------------
@@ -323,6 +345,7 @@ cp README.md install.sh "$STAGE/fp6-img/"
 	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "default login: user / 147147 (same as official postmarketOS images)"
 	echo "imsd:          $IMSD_REGISTRY imsd-$IMSD_VERSION (registry package, sha256-pinned)"
+	echo "fingerprintd:  $IMSD_REGISTRY fingerprintd-$FPD_VERSION (registry package, sha256-pinned)"
 } > "$STAGE/fp6-img/build-info.txt"
 # sums of the extracted contents
 (cd "$STAGE/fp6-img" && sha256sum -- * > sha256sums.txt)

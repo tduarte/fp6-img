@@ -14,7 +14,9 @@ Maintained by [Jorijn van der Graaf](https://catcrafts.net/about)
 
 Everything on the `combined-stable` branch: display, touch, wifi, cellular
 data, NFC (reader), speaker audio, microphone, IMU, magnetometer, barometer,
-ambient light/proximity plus VoLTE calls (both directions) through imsd.
+ambient light/proximity, fingerprint unlock through
+[fingerprintd](https://forgejo.catcrafts.net/Catcrafts/fingerprintd), plus
+VoLTE calls (both directions) through imsd.
 
 ## Flashing
 
@@ -50,3 +52,25 @@ Find it in a stock-firmware capture or your carrier's IMS documentation, then
 file to exist). See the
 [imsd README](https://forgejo.catcrafts.net/Catcrafts/imsd) for the full
 variable reference and carrier assumptions.
+
+## Fingerprint
+
+Enrol under **Settings → Users** (Plasma's own fingerprint page; the `fprintd`
+command-line tools are not installed, fingerprintd replaces that package).
+**Hold** the finger on the sensor for each of the ~20 presses rather than
+tapping it; a held press is what the matcher was measured on.
+
+Two things to know:
+
+- The lock screen listens for a finger for **60 seconds after it appears**.
+  A press after that reaches nothing and looks like a dead sensor. Lock and
+  unlock again to re-arm it.
+- The matcher is the phone's own proprietary trustlet, reassembled from the
+  stock modem partition on first boot and never shipped by us. Templates are
+  stored on the Android `persist` partition, sealed to the same hardware
+  anti-rollback counter stock Android uses. Whether fingerprints enrolled under
+  stock Android survive a return to it after using this has **not** been
+  tested.
+
+A finger can also run something in your session on a match
+(`~/.config/fingerprintd/fingers.conf`, see the fingerprintd README).
