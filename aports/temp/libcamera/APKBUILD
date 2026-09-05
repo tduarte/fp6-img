@@ -3,7 +3,7 @@ maintainer="Robert Mader <robert.mader@collabora.com>"
 pkgname=libcamera
 _pkgver=0.7.2
 pkgver=9999$_pkgver
-pkgrel=9
+pkgrel=10
 pkgdesc="Linux camera framework"
 url="https://libcamera.org/"
 arch="all"
@@ -83,6 +83,13 @@ builddir="$srcdir/$pkgname-v$_pkgver"
 # gstreamer tests fail
 # manual strip because ipa .sign files depend on the file contents- have to re-sign after strip
 options="!strip !check"
+# fp6-img: this package only ever runs on the FP6 (4x Cortex-A520 + 4x
+# Cortex-A720), so tune for it. Spelled -march/-mtune, not -mcpu: GCC 16
+# expands -mcpu=cortex-a720 into a +sve-bitperm token that binutils 2.45
+# rejects at the assembler. +nosve+nomemtag: the FP6 exposes neither SVE nor
+# MTE (no sve/mte hwcaps), and without them the code would SIGILL.
+export CFLAGS="$CFLAGS -march=armv9.2-a+nosve+nomemtag -mtune=cortex-a720"
+export CXXFLAGS="$CXXFLAGS -march=armv9.2-a+nosve+nomemtag -mtune=cortex-a720"
 
 case "$CARCH" in
 arm*|aarch64)

@@ -8,7 +8,7 @@ _flavor="postmarketos-qcom-milos"
 pkgname=linux-$_flavor
 pkgver=7.2.0
 # always sorts above the upstream aport (r0..r99)
-pkgrel=101
+pkgrel=102
 pkgdesc="Milos mainline kernel + Catcrafts FP6 bring-up carries (combined-stable)"
 arch="aarch64"
 _carch="arm64"
@@ -57,7 +57,14 @@ prepare() {
 
 build() {
 	unset LDFLAGS
+	# Build for the cores this image runs on: 4x Cortex-A520 + 4x Cortex-A720.
+	# The stock arm64 build gives the compiler no arch flag so one image boots
+	# any Armv8 board; this one boots the FP6. armv8.6-a is the highest level
+	# whose mandatory set the phone exposes (8.7 would assume WFxT, 9.x SVE2;
+	# neither is in its hwcaps); +fp16fml+aes+sha3+sm4 are the optional
+	# extensions it has, the same set `gcc -march=native` derives on the phone.
 	make ARCH="$_carch" LLVM=1 \
+		KCFLAGS="-march=armv8.6-a+fp16fml+aes+sha3+sm4 -mtune=cortex-a720" \
 		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-$_flavor"
 }
 

@@ -7,7 +7,7 @@ maintainer="Achill Gilgenast <achill@achill.org>"
 pkgname=libqmi
 pkgver=1.39.1_git20260808
 _commit=30f3e998e6cbda364ac1bc73223de20561e6d555
-pkgrel=100
+pkgrel=101
 pkgdesc="QMI modem protocol helper library"
 url="https://www.freedesktop.org/wiki/Software/libqmi"
 arch="all"
@@ -27,6 +27,12 @@ makedepends="
 # fp6-img: crossdirect breaks meson compiler introspection (cc1 spawn
 # failure), same as modemmanager; build under plain qemu.
 options="!pmb:crossdirect"
+# fp6-img: this package only ever runs on the FP6 (4x Cortex-A520 + 4x
+# Cortex-A720), so tune for it. Spelled -march/-mtune, not -mcpu: GCC 16
+# expands -mcpu=cortex-a720 into a +sve-bitperm token that binutils 2.45
+# rejects at the assembler. +nosve+nomemtag: the FP6 exposes neither SVE nor
+# MTE (no sve/mte hwcaps), and without them the code would SIGILL.
+export CFLAGS="$CFLAGS -march=armv9.2-a+nosve+nomemtag -mtune=cortex-a720"
 subpackages="
 	$pkgname-dev
 	$pkgname-doc

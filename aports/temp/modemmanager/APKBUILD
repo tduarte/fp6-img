@@ -5,7 +5,7 @@
 maintainer="Achill Gilgenast <achill@achill.org>"
 pkgname=modemmanager
 pkgver=1.25.95_git20260709
-pkgrel=100
+pkgrel=101
 _commit=d776ea38d29ca472a12323c1d45002ee19a66f57
 pkgdesc="ModemManager library"
 url="https://www.freedesktop.org/wiki/Software/ModemManager"
@@ -42,6 +42,12 @@ checkdepends="glib-dev py3-gobject3 py3-dbus"
 # native builders, and none exercise the GNSS code our patches change) -
 # on-device validation is the real test.
 options="!pmb:crossdirect !check"
+# fp6-img: this package only ever runs on the FP6 (4x Cortex-A520 + 4x
+# Cortex-A720), so tune for it. Spelled -march/-mtune, not -mcpu: GCC 16
+# expands -mcpu=cortex-a720 into a +sve-bitperm token that binutils 2.45
+# rejects at the assembler. +nosve+nomemtag: the FP6 exposes neither SVE nor
+# MTE (no sve/mte hwcaps), and without them the code would SIGILL.
+export CFLAGS="$CFLAGS -march=armv9.2-a+nosve+nomemtag -mtune=cortex-a720"
 subpackages="
 	$pkgname-lang
 	$pkgname-doc
