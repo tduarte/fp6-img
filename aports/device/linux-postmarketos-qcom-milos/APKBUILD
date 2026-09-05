@@ -8,7 +8,7 @@ _flavor="postmarketos-qcom-milos"
 pkgname=linux-$_flavor
 pkgver=7.2.0
 # always sorts above the upstream aport (r0..r99)
-pkgrel=100
+pkgrel=101
 pkgdesc="Milos mainline kernel + Catcrafts FP6 bring-up carries (combined-stable)"
 arch="aarch64"
 _carch="arm64"
