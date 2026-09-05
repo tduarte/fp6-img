@@ -14,7 +14,7 @@
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=fp6-vendor-blobs
 pkgver=1
-pkgrel=1
+pkgrel=2
 pkgdesc="On-device extraction of vendor blobs from the stock Android partitions"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
 arch="noarch"

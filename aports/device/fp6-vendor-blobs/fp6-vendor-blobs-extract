@@ -10,6 +10,7 @@
 # processed in sorted order; '#' comments and blank lines ignored:
 #
 #   file <partition[,partition...]> <path-in-partition> <dest> <sha256>
+#   mbn  <partition[,partition...]> <dir-in-partition> <name> <dest> <sha256>
 #   rebind <bus> <device>
 #
 # file: mount the first available listed partition READ-ONLY (ext4 also
@@ -20,6 +21,16 @@
 #   unverified blob is never installed and a missing one never silently
 #   skipped. Dests that already exist are left alone (no hashing: a
 #   deliberately replaced file stays).
+# mbn: the same, for a Qualcomm trustlet, which is not shipped as one file.
+#   QTEE images live in the modem partition's image/ as an ELF header+hashes
+#   file (<name>.mdt) plus one payload per program header (<name>.b00, .b01,
+#   ...), and the loader wants them written back at each segment's p_offset.
+#   Reassembly is therefore not a concatenation: segments are page aligned
+#   but not contiguous, gaps stay zero, and two segments may share an offset
+#   (focal64 has two such pairs), so they are written in index order and the
+#   later one wins. Same guarantees as file: the sha256 is of the reassembled
+#   image, a mismatch tries the next partition, and an unverified image is
+#   never installed.
 # rebind: if this fragment's run extracted at least one file, unbind and
 #   re-probe <device> on <bus> so the consuming driver picks the file up
 #   in the same boot. Unconditional on purpose: a still-bound consumer may
@@ -103,6 +114,90 @@ mount_part() {
 	MNT_PART=$1
 }
 
+# Little-endian scalars out of an ELF header. aarch64 is little endian and so
+# is the image, so od's host order is the right one.
+u64() { od -An -tu8 -j "$2" -N 8 "$1" | tr -d ' '; }
+u16() { od -An -tu2 -j "$2" -N 2 "$1" | tr -d ' '; }
+
+# Reassemble <dir>/<name>.mdt + .b0N into a flat image at <out>. Mirrors
+# utilities/ta-analysis/reassemble.py in the fp6 bring-up repo, which is where
+# the format was worked out and where the known-good hash comes from.
+# POSIX sh has no locals, so these names are deliberately distinct from
+# extract_mbn's: reassemble() taking rdir= would rewrite its CALLER's copy to
+# the mount path, and the next partition in the retry loop would then be
+# searched at $MNT/$MNT/...
+reassemble() { # <dir> <name> <out>
+	mdir=$1 mname=$2 mout=$3
+	mdt="$mdir/$mname.mdt"
+	[ -f "$mdt" ] || return 1
+	phoff=$(u64 "$mdt" 32) phentsize=$(u16 "$mdt" 54) phnum=$(u16 "$mdt" 56)
+	[ -n "$phoff" ] && [ -n "$phentsize" ] && [ -n "$phnum" ] || return 1
+	[ "$phnum" -gt 0 ] 2>/dev/null || return 1
+
+	# The image is as long as the furthest segment reaches; everything no
+	# segment covers stays zero.
+	total=0 i=0
+	while [ "$i" -lt "$phnum" ]; do
+		o=$((phoff + i * phentsize))
+		pfsz=$(u64 "$mdt" $((o + 32)))
+		if [ "$pfsz" -gt 0 ]; then
+			poff=$(u64 "$mdt" $((o + 8)))
+			[ $((poff + pfsz)) -gt "$total" ] && total=$((poff + pfsz))
+		fi
+		i=$((i + 1))
+	done
+	[ "$total" -gt 0 ] || return 1
+	: > "$mout" || return 1
+	truncate -s "$total" "$mout" || return 1
+
+	i=0
+	while [ "$i" -lt "$phnum" ]; do
+		o=$((phoff + i * phentsize))
+		pfsz=$(u64 "$mdt" $((o + 32)))
+		if [ "$pfsz" -gt 0 ]; then
+			poff=$(u64 "$mdt" $((o + 8)))
+			seg=$(printf '%s/%s.b%02d' "$mdir" "$mname" "$i")
+			[ -f "$seg" ] || { log "$mname: segment $i missing"; return 1; }
+			# dd seeks in whole blocks, which is only correct because
+			# every p_offset in these images is page aligned. Refuse
+			# rather than silently misplace a segment if that changes.
+			[ $((poff % 4096)) -eq 0 ] || {
+				log "$mname: segment $i offset $poff is not page aligned"
+				return 1
+			}
+			dd if="$seg" of="$mout" bs=4096 seek=$((poff / 4096)) \
+				conv=notrunc 2>/dev/null || return 1
+		fi
+		i=$((i + 1))
+	done
+	return 0
+}
+
+extract_mbn() { # <partition,...> <dir-in-partition> <name> <dest> <sha256>
+	parts=$1 rdir=$2 rname=$3 dest=$4 want=$5
+	for part in $(echo "$parts" | tr ',' ' '); do
+		mount_part "$part" || { log "$part: not mountable, trying next"; continue; }
+		[ -f "$MNT/$rdir/$rname.mdt" ] || { log "$part: no $rdir/$rname.mdt, trying next"; continue; }
+		tmp="$dest.fp6-extract.$$"
+		mkdir -p "${dest%/*}" || fail "cannot create ${dest%/*}"
+		if ! reassemble "$MNT/$rdir" "$rname" "$tmp"; then
+			rm -f "$tmp"
+			log "$part: reassembling $rname failed, trying next"
+			continue
+		fi
+		got=$(sha256sum "$tmp" | awk '{print $1}')
+		if [ "$got" != "$want" ]; then
+			rm -f "$tmp"
+			log "$part:$rdir/$rname sha256 $got != expected, trying next"
+			continue
+		fi
+		chmod 644 "$tmp" && mv "$tmp" "$dest" || { rm -f "$tmp"; fail "installing $dest failed"; }
+		log "reassembled $part:$rdir/$rname.{mdt,b0N} -> $dest"
+		return 0
+	done
+	fail "no listed partition ($parts) yields $rname with sha256 $want - $dest NOT installed"
+}
+
 extract() { # <partition,...> <path-in-partition> <dest> <sha256>
 	parts=$1 src=$2 dest=$3 want=$4
 	for part in $(echo "$parts" | tr ',' ' '); do
@@ -155,8 +250,11 @@ fi
 missing=
 for f in "$MANIFEST_DIR"/*.manifest; do
 	[ -e "$f" ] || continue
-	while read -r kind _ _ dest _; do
-		[ "$kind" = file ] && [ ! -e "$dest" ] && missing=1
+	while read -r kind a b c d e; do
+		case "$kind" in
+		file) [ -e "$c" ] || missing=1 ;;
+		mbn)  [ -e "$d" ] || missing=1 ;;
+		esac
 	done < "$f"
 done
 [ -z "$missing" ] && exit 0
@@ -165,13 +263,19 @@ for f in "$MANIFEST_DIR"/*.manifest; do
 	[ -e "$f" ] || continue
 	extracted=
 	rebinds=
-	while read -r kind a b c d; do
+	while read -r kind a b c d e; do
 		case "$kind" in
 		''|'#'*) ;;
 		file)
 			[ -n "$d" ] || fail "$f: malformed file line"
 			[ -e "$c" ] && continue
 			extract "$a" "$b" "$c" "$d" </dev/null
+			extracted=1
+			;;
+		mbn)
+			[ -n "$e" ] || fail "$f: malformed mbn line"
+			[ -e "$d" ] && continue
+			extract_mbn "$a" "$b" "$c" "$d" "$e" </dev/null
 			extracted=1
 			;;
 		rebind)
