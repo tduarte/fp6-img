@@ -84,12 +84,13 @@ builddir="$srcdir/$pkgname-v$_pkgver"
 # manual strip because ipa .sign files depend on the file contents- have to re-sign after strip
 options="!strip !check"
 # fp6-img: this package only ever runs on the FP6 (4x Cortex-A520 + 4x
-# Cortex-A720), so tune for it. Spelled -march/-mtune, not -mcpu: GCC 16
-# expands -mcpu=cortex-a720 into a +sve-bitperm token that binutils 2.45
-# rejects at the assembler. +nosve+nomemtag: the FP6 exposes neither SVE nor
-# MTE (no sve/mte hwcaps), and without them the code would SIGILL.
-export CFLAGS="$CFLAGS -march=armv9.2-a+nosve+nomemtag -mtune=cortex-a720"
-export CXXFLAGS="$CXXFLAGS -march=armv9.2-a+nosve+nomemtag -mtune=cortex-a720"
+# Cortex-A720), so build for it. armv8.6-a is the highest level whose
+# mandatory set the phone exposes (8.7 would assume WFxT, 9.x SVE2; neither
+# is in its hwcaps); +fp16fml+aes+sha3+sm4 are the optional extensions it
+# has, the same set `gcc -march=native` derives on the phone. One spelling
+# for gcc and clang, and the same string the kernel aport uses.
+export CFLAGS="$CFLAGS -march=armv8.6-a+fp16fml+aes+sha3+sm4 -mtune=cortex-a720"
+export CXXFLAGS="$CXXFLAGS -march=armv8.6-a+fp16fml+aes+sha3+sm4 -mtune=cortex-a720"
 
 case "$CARCH" in
 arm*|aarch64)
