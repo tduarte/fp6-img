@@ -47,6 +47,11 @@ FPD_SHA256="
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
 cd "$(dirname "$0")"
+# Fail in seconds, not at minute 57: a stale sha512sum in one of our own
+# aports (run 52, fp6-vendor-blobs 1-r2) only surfaces when abuild reaches that
+# aport, an hour into the run. This checks every aport's local source files
+# against the committed sums before pmbootstrap does anything.
+./check-aports.sh
 
 # pmbootstrap refuses to run as root: install deps, then re-exec as a build
 # user with passwordless sudo (pmbootstrap escalates itself where needed).
