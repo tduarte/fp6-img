@@ -35,8 +35,8 @@ cd fp6-img
 inside Linux where the bootloader's NV-wipe cannot see it, then reads the modem
 NV back and reports the result. The bootloader never writes `boot`.
 
-Default login: `user` / `147147` (same as official postmarketOS images —
-change it). **Never re-lock the bootloader** with a custom image installed.
+Default login: `user` / `147147` (same as official postmarketOS images). 
+**Never re-lock the bootloader** with a custom image installed.
 
 ## VoLTE configuration
 
@@ -47,30 +47,8 @@ imsd is installed but needs your carrier's P-CSCF address:
 PCSCF=<your carrier's P-CSCF IPv6 address>
 ```
 
-Find it in a stock-firmware capture or your carrier's IMS documentation, then
+Find it via android adb using `adb shell dumpsys telephony.registry`, then
 `systemctl restart imsd` (the service is enabled at boot and waits for this
 file to exist). See the
 [imsd README](https://forgejo.catcrafts.net/Catcrafts/imsd) for the full
 variable reference and carrier assumptions.
-
-## Fingerprint
-
-Enrol under **Settings → Users** (Plasma's own fingerprint page; the `fprintd`
-command-line tools are not installed, fingerprintd replaces that package).
-**Hold** the finger on the sensor for each of the ~20 presses rather than
-tapping it; a held press is what the matcher was measured on.
-
-Two things to know:
-
-- The lock screen listens for a finger for **60 seconds after it appears**.
-  A press after that reaches nothing and looks like a dead sensor. Lock and
-  unlock again to re-arm it.
-- The matcher is the phone's own proprietary trustlet, reassembled from the
-  stock modem partition on first boot and never shipped by us. Templates are
-  stored on the Android `persist` partition, sealed to the same hardware
-  anti-rollback counter stock Android uses. Whether fingerprints enrolled under
-  stock Android survive a return to it after using this has **not** been
-  tested.
-
-A finger can also run something in your session on a match
-(`~/.config/fingerprintd/fingers.conf`, see the fingerprintd README).
