@@ -25,11 +25,16 @@ KERNEL_BRANCH=combined-stable
 # Bump deliberately, not via tip-chasing.
 # 0.3.1: 0.3.0 + the ims-pdn-up hardening (mmcli errors logged verbatim,
 # registration gate, configurable ip-type) + README carrier updates.
+# 0.3.2: landline callers ring (AMR-NB + G.711 media leg, any playable codec
+# accepted, offered codecs named on 488), INVITE validated before the UI is
+# told, AMR-NB offered after AMR-WB, CODECS override; built for the A520/A720.
+# 0.3.3: 0.3.2 + the media leg resolves the audio user once and thread-safely
+# (a getpwnam race could aim both PipeWire helpers at /run/user/0: static).
 IMSD_REGISTRY=https://forgejo.catcrafts.net/api/packages/Catcrafts/alpine/edge/fp6
-IMSD_VERSION=0.3.1-r0
+IMSD_VERSION=0.3.3-r0
 IMSD_SHA256="
-f1c317d7ff9448c05df068d683d31da08e4bfc074704d96cf52cb8acbdee6304  imsd-0.3.1-r0.apk
-a78ef31fc2943ac02e120c46df26353d515ac9840d959cf5193b2afe1c665fa6  imsd-systemd-0.3.1-r0.apk
+54755ca4aefaa0a7f98a0ce6c6515cf8e0ed1d86734e3f78a3b58f28c38f75b5  imsd-0.3.3-r0.apk
+226217f5aeea009462757fc89aa030964ba92ac1a22501bf8f75b92fa693f9f9  imsd-systemd-0.3.3-r0.apk
 "
 # fingerprintd (fingerprint unlock) comes from the same registry the same way:
 # its repo's package CI is the only producer, and the same pinning rule holds.
