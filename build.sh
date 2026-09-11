@@ -18,37 +18,18 @@ set -eu
 
 KERNEL_REPO=https://forgejo.catcrafts.net/Catcrafts/milos-linux.git
 KERNEL_BRANCH=combined-stable
-# imsd is not built here: the image installs the apk the imsd repo's package
-# CI publishes to the registry (section 3b), so image and 'apk upgrade' carry
-# the same binary. Pinned by version AND by the sha256 of the registry files;
-# a bump is these lines (sha256sum the two apks under $IMSD_REGISTRY/aarch64/).
-# Bump deliberately, not via tip-chasing.
-# 0.3.1: 0.3.0 + the ims-pdn-up hardening (mmcli errors logged verbatim,
-# registration gate, configurable ip-type) + README carrier updates.
-# 0.3.2: landline callers ring (AMR-NB + G.711 media leg, any playable codec
-# accepted, offered codecs named on 488), INVITE validated before the UI is
-# told, AMR-NB offered after AMR-WB, CODECS override; built for the A520/A720.
-# 0.3.3: 0.3.2 + the media leg resolves the audio user once and thread-safely
-# (a getpwnam race could aim both PipeWire helpers at /run/user/0: static).
-IMSD_REGISTRY=https://forgejo.catcrafts.net/api/packages/Catcrafts/alpine/edge/fp6
-IMSD_VERSION=0.3.3-r0
-IMSD_SHA256="
-54755ca4aefaa0a7f98a0ce6c6515cf8e0ed1d86734e3f78a3b58f28c38f75b5  imsd-0.3.3-r0.apk
-226217f5aeea009462757fc89aa030964ba92ac1a22501bf8f75b92fa693f9f9  imsd-systemd-0.3.3-r0.apk
-"
-# fingerprintd (fingerprint unlock) comes from the same registry the same way:
-# its repo's package CI is the only producer, and the same pinning rule holds.
-# Three apks: the daemon, its systemd units, and the session agent (inert
-# until a user writes ~/.config/fingerprintd/fingers.conf). Needs the kernel
-# aport's CONFIG_QCOMTEE=m (pkgrel 101) and fp6-vendor-blobs >= 1-r2, both
-# built in this run. 0.2.3: 0.2.2 (enrol, unlock, agent, actions) + the
-# versioned blobs dependency + a post-upgrade daemon restart.
-FPD_VERSION=0.2.3-r0
-FPD_SHA256="
-3e28f0c1a9a844592ab6878b2dfc0d8f91674549e44bdc1652e7d7d029de1765  fingerprintd-0.2.3-r0.apk
-0cc46eba5c6c77d5bb54cd9f0e2902f7644720f9c98153062ffa33e19ca36889  fingerprintd-systemd-0.2.3-r0.apk
-6dfdbc6f971ba4b8f811f828e5868869c7d71fea6c7045e2bffd51bf2736c040  fingerprintd-agent-0.2.3-r0.apk
-"
+# imsd and fingerprintd are not built here: each repo's package CI publishes
+# its apk to the registry, and the image installs the NEWEST published
+# version (section 3b), so a fresh install carries the same binary every
+# installed phone gets from 'apk upgrade', and a release of either needs no
+# commit here. Integrity comes from the same place as on the phones: the
+# registry index is verified against the key catcrafts-fp6-repo ships
+# (aports/device/, the phones' /etc/apk/keys) and each apk against that
+# index, by registry-fetch.py. The resolved versions and sha256s are in the
+# build summary. Until 2026-09-11 both were pinned here by version and
+# sha256; that gated fresh installs only, never upgrades, and cost a commit
+# and an image run per release.
+REGISTRY=https://forgejo.catcrafts.net/api/packages/Catcrafts/alpine/edge/fp6
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
 cd "$(dirname "$0")"
@@ -270,31 +251,29 @@ retry "build modemmanager" pmbootstrap $NOCROSS build --arch aarch64 modemmanage
 retry "build libcamera" pmbootstrap $NOCROSS build --arch aarch64 libcamera
 # --- 3b. imsd + fingerprintd: the published apks, not local builds -----------
 # Each repo's package CI is the only producer of its apk; the image installs
-# the exact registry package users later get via 'apk upgrade'.
+# the newest registry package, the one users get via 'apk upgrade'.
 # pmbootstrap has no knob for a third-party repository, and after the main
 # 'apk add' it re-adds every package found in its local packages dir BY FILE
 # PATH — which makes apk verify the package's own signature, and registry
 # packages are signed with per-run keys nobody keeps (phones trust the
-# registry-signed index instead). So: fetch, check against the sha256 pin,
-# re-sign the envelope with this run's abuild key (control and data streams
-# stay byte-identical, so the identity checksum equals the registry's), drop
-# into the local packages dir, re-index. The abuild key exists because the
-# builds above initialized the buildroot.
+# registry-signed index instead). So: fetch the newest of each, verified the
+# way a phone verifies them (registry-fetch.py: index signature against the
+# shipped key, control checksum and data hash against the index), re-sign
+# the envelope with this run's abuild key (control and data streams stay
+# byte-identical, so the identity checksum equals the registry's), drop into
+# the local packages dir, re-index. The abuild key exists because the builds
+# above initialized the buildroot. Each group's first name decides the
+# version; its subpackages must exist at that same version.
 REG_DL="$WORK/registry-apks"
 rm -rf "$REG_DL"
 mkdir -p "$REG_DL"
-for _f in "imsd-$IMSD_VERSION.apk" "imsd-systemd-$IMSD_VERSION.apk" \
-          "fingerprintd-$FPD_VERSION.apk" "fingerprintd-systemd-$FPD_VERSION.apk" \
-          "fingerprintd-agent-$FPD_VERSION.apk"; do
-	# every fetched file must have a pin: 'grep .' below drops empty lines,
-	# so an empty pin list would otherwise pass the check with nothing checked
-	printf '%s\n' "$IMSD_SHA256" "$FPD_SHA256" | grep -q "  $_f\$" || {
-		echo "no sha256 pin for $_f - add it to IMSD_SHA256/FPD_SHA256" >&2
-		exit 1
-	}
-	retry "fetch $_f" curl -fsSL -o "$REG_DL/$_f" "$IMSD_REGISTRY/aarch64/$_f"
-done
-(cd "$REG_DL" && printf '%s\n' "$IMSD_SHA256" "$FPD_SHA256" | grep . | sha256sum -c -)
+REGISTRY_KEY=$(echo aports/device/catcrafts-fp6-repo/*.rsa.pub)
+if [ ! -f "$REGISTRY_KEY" ]; then
+	echo "expected exactly one registry key in aports/device/catcrafts-fp6-repo" >&2
+	exit 1
+fi
+retry "fetch registry packages" python3 ./registry-fetch.py "$REGISTRY" "$REGISTRY_KEY" "$REG_DL" \
+	imsd,imsd-systemd fingerprintd,fingerprintd-systemd,fingerprintd-agent
 ABUILD_KEY=$(echo "$WORKDIR"/config_abuild/*.rsa)
 if [ ! -f "$ABUILD_KEY" ]; then
 	echo "expected exactly one abuild key in $WORKDIR/config_abuild" >&2
@@ -354,8 +333,9 @@ cp README.md install.sh "$STAGE/fp6-img/"
 	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
 	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "default login: user / 147147 (same as official postmarketOS images)"
-	echo "imsd:          $IMSD_REGISTRY imsd-$IMSD_VERSION (registry package, sha256-pinned)"
-	echo "fingerprintd:  $IMSD_REGISTRY fingerprintd-$FPD_VERSION (registry package, sha256-pinned)"
+	while read -r _n _v _s; do
+		printf '%-14s %s %s-%s (newest registry package, sha256 %s)\n' "$_n:" "$REGISTRY" "$_n" "$_v" "$_s"
+	done < "$REG_DL/manifest"
 } > "$STAGE/fp6-img/build-info.txt"
 # sums of the extracted contents
 (cd "$STAGE/fp6-img" && sha256sum -- * > sha256sums.txt)
