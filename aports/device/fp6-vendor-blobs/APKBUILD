@@ -10,11 +10,18 @@
 # their post-install/post-upgrade should also run
 # /usr/lib/fp6-vendor-blobs/extract --if-device so a package upgrade that
 # drops a previously-shipped blob restores the file immediately instead of
-# at the next boot. First consumer: soc-fairphone-fp6-audio (aw88261 acf).
+# at the next boot (--refresh in addition for an mbn consumer: it re-derives
+# the trustlet from the active slot even if a file is present). Consumers:
+# soc-fairphone-fp6-audio (aw88261 acf), fingerprintd (focal64 trustlet).
+#
+# 1-r3 (2026-09-11): active slot first, an unpinned ('-') structurally
+# verified mode for mbn, --refresh -- after two field units got no
+# fingerprint sensor from a whole-image hash pin that can only match one
+# Android build (fp6 repo journal/blobs/, journal/fingerprint/).
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=fp6-vendor-blobs
 pkgver=1
-pkgrel=2
+pkgrel=3
 pkgdesc="On-device extraction of vendor blobs from the stock Android partitions"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
 arch="noarch"
@@ -55,7 +62,7 @@ package() {
 }
 
 sha512sums="
-2caafdedf93e103516834a1f815dd828ecee66c82d569e4a925ccc6bd6ac75d6778290adb02db69538af3bb6ad36cee5c13c8afba2c722a4c4550efe761ba8a0  fp6-vendor-blobs-extract
+e9618b4a1ccbe0913a608b32a1a9e87337e3da79a3d7ccc7f49292ae9aaa9406d2ea9817d63b3cfff2c4346b80dd2476c10725f4f0f95c859acd17b22ec03a16  fp6-vendor-blobs-extract
 b4c290095d9f39515378dfef08de720ce49324210342aa13c131dfce1103785e796e6f821f0c659671a4c44b46f466ce0e03f11f216fdcdee2a99db5e7970800  fp6-vendor-blobs.service
 9e79dd0aed13f11a71282aa24b2a26331e85c105e25ab0c0fed6189b8c300769a5f4308b18b91d9855868d658ad3a57c03e26c9b11bd27fd5e03f9a5decbbd6a  fp6-vendor-blobs.preset
 "
