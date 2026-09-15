@@ -1,0 +1,7 @@
+# The package also ships the multi-user.target.wants symlink, but a
+# `systemctl preset-all` (pmbootstrap runs one while building the image)
+# strips manually-installed .wants links for any unit whose preset does not
+# enable it -- which left the service `disabled; preset: disabled` in the
+# 2026-08-24 image and so no aw88261_acf.bin and no sound card on a fresh
+# install. This preset is what makes the enable survive that.
+enable fp6-vendor-blobs.service

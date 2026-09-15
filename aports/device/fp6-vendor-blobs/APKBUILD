@@ -25,6 +25,7 @@ options="!check"
 source="
 	fp6-vendor-blobs-extract
 	fp6-vendor-blobs.service
+	fp6-vendor-blobs.preset
 "
 
 package() {
@@ -38,10 +39,18 @@ package() {
 	mkdir -p "$pkgdir"/etc/systemd/system/multi-user.target.wants
 	ln -s /usr/lib/systemd/system/fp6-vendor-blobs.service \
 		"$pkgdir"/etc/systemd/system/multi-user.target.wants/fp6-vendor-blobs.service
+	# ...and a preset, because the symlink alone does NOT survive: image
+	# build runs `systemctl preset-all`, which removes .wants links for any
+	# unit not enabled by a preset. That is what shipped the 2026-08-24
+	# image with the service `disabled; preset: disabled` -- no blob
+	# extracted, no sound card. See journal/blobs/ 2026-08-28.
+	install -Dm644 "$srcdir"/fp6-vendor-blobs.preset \
+		"$pkgdir"/usr/lib/systemd/system-preset/50-fp6-vendor-blobs.preset
 	mkdir -p "$pkgdir"/usr/share/fp6-vendor-blobs/manifest.d
 }
 
 sha512sums="
 a71b2c86f980734d0aae6e135b26272fe52ae5603050bea52f55f7e74c8bd98c62b6194047711248d4fef40851792adc47d77c40016d99a0d68ecd2459894b80  fp6-vendor-blobs-extract
 e2c03e5016f1848c57e6160ce432530b181ff5d34a5aaf1822f0ffa5fe71d16691657ada4a5789c4d4209e14e83f43aab072d01f644b07b93648f91e2a7bb0ca  fp6-vendor-blobs.service
+9e79dd0aed13f11a71282aa24b2a26331e85c105e25ab0c0fed6189b8c300769a5f4308b18b91d9855868d658ad3a57c03e26c9b11bd27fd5e03f9a5decbbd6a  fp6-vendor-blobs.preset
 "
