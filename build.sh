@@ -30,6 +30,18 @@ KERNEL_BRANCH=combined-stable
 # sha256; that gated fresh installs only, never upgrades, and cost a commit
 # and an image run per release.
 REGISTRY=https://forgejo.catcrafts.net/api/packages/Catcrafts/alpine/edge/fp6
+# FP6IMG_UI: which postmarketOS UI the image boots into. plasma-mobile (the
+# default) gets imsd-dialerd from the imsd package itself; phosh gets the
+# opt-in imsd-ofono subpackage (imsd-ofonod + the GNOME Calls plugin
+# override) on top. Everything else in the package set is UI-agnostic. The
+# archive is named after it: fp6-img.tar.xz for plasma-mobile,
+# fp6-img-<ui>.tar.xz otherwise, so one release can carry both.
+FP6IMG_UI=${FP6IMG_UI:-plasma-mobile}
+case "$FP6IMG_UI" in
+plasma-mobile) UI_PACKAGES=; IMG_NAME=fp6-img ;;
+phosh)         UI_PACKAGES=,imsd-ofono; IMG_NAME=fp6-img-phosh ;;
+*) echo "FP6IMG_UI=$FP6IMG_UI: expected plasma-mobile or phosh" >&2; exit 1 ;;
+esac
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
 cd "$(dirname "$0")"
@@ -83,11 +95,13 @@ if [ "$(id -u)" = 0 ]; then
 	id build >/dev/null 2>&1 || adduser -D build
 	echo 'build ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/build
 	# empty dist in place (never delete the dir itself: a shell cd'd into it
-	# would poison the next podman invocation's cwd)
+	# would poison the next podman invocation's cwd). FP6IMG_KEEP_DIST=1 keeps
+	# what is there: the second UI build of one run adds its archive next to
+	# the first one's.
 	install -d -o build dist
-	find dist -mindepth 1 -delete
+	[ -n "${FP6IMG_KEEP_DIST:-}" ] || find dist -mindepth 1 -delete
 	# su scrubs the environment — carry the knobs that matter across it
-	exec su build -c "FP6IMG_NO_CROSSDIRECT='${FP6IMG_NO_CROSSDIRECT:-}' sh -eu '$PWD/build.sh'"
+	exec su build -c "FP6IMG_NO_CROSSDIRECT='${FP6IMG_NO_CROSSDIRECT:-}' FP6IMG_UI='${FP6IMG_UI:-}' sh -eu '$PWD/build.sh'"
 fi
 
 # git hosts occasionally hiccup (our forgejo lives on a small VM that also
@@ -218,9 +232,9 @@ cat > "$HOME/.config/pmbootstrap_v3.cfg" <<EOF
 [pmbootstrap]
 aports = $WORK/pmaports
 device = fairphone-fp6
-ui = plasma-mobile
+ui = $FP6IMG_UI
 systemd = always
-extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fingerprintd,fingerprintd-systemd,fingerprintd-agent,fp6-device-tweaks,fp6-charging-mode,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel
+extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fingerprintd,fingerprintd-systemd,fingerprintd-agent,fp6-device-tweaks,fp6-charging-mode,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel$UI_PACKAGES
 EOF
 
 # All four source tarballs are generated locally above, so every checksum
@@ -273,7 +287,7 @@ if [ ! -f "$REGISTRY_KEY" ]; then
 	exit 1
 fi
 retry "fetch registry packages" python3 ./registry-fetch.py "$REGISTRY" "$REGISTRY_KEY" "$REG_DL" \
-	imsd,imsd-systemd fingerprintd,fingerprintd-systemd,fingerprintd-agent
+	imsd,imsd-systemd,imsd-ofono fingerprintd,fingerprintd-systemd,fingerprintd-agent
 ABUILD_KEY=$(echo "$WORKDIR"/config_abuild/*.rsa)
 if [ ! -f "$ABUILD_KEY" ]; then
 	echo "expected exactly one abuild key in $WORKDIR/config_abuild" >&2
@@ -325,21 +339,22 @@ pmbootstrap export "$EXPORT"
 # so the archive is built without a second 3 GiB copy on disk.
 STAGE="$WORK/stage"
 rm -rf "$STAGE"
-mkdir -p "$STAGE/fp6-img"
-ln -s "$EXPORT/boot.img" "$STAGE/fp6-img/boot.img"
-ln -s "$EXPORT/fairphone-fp6.img" "$STAGE/fp6-img/fairphone-fp6.img"
-cp README.md install.sh "$STAGE/fp6-img/"
+mkdir -p "$STAGE/$IMG_NAME"
+ln -s "$EXPORT/boot.img" "$STAGE/$IMG_NAME/boot.img"
+ln -s "$EXPORT/fairphone-fp6.img" "$STAGE/$IMG_NAME/fairphone-fp6.img"
+cp README.md install.sh "$STAGE/$IMG_NAME/"
 {
 	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
+	echo "ui:            $FP6IMG_UI"
 	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "default login: user / 147147 (same as official postmarketOS images)"
 	while read -r _n _v _s; do
 		printf '%-14s %s %s-%s (newest registry package, sha256 %s)\n' "$_n:" "$REGISTRY" "$_n" "$_v" "$_s"
 	done < "$REG_DL/manifest"
-} > "$STAGE/fp6-img/build-info.txt"
+} > "$STAGE/$IMG_NAME/build-info.txt"
 # sums of the extracted contents
-(cd "$STAGE/fp6-img" && sha256sum -- * > sha256sums.txt)
-tar -C "$STAGE" -chf - fp6-img | xz -T0 -6 > dist/fp6-img.tar.xz
+(cd "$STAGE/$IMG_NAME" && sha256sum -- * > sha256sums.txt)
+tar -C "$STAGE" -chf - "$IMG_NAME" | xz -T0 -6 > "dist/$IMG_NAME.tar.xz"
 rm -rf "$STAGE"
 
 ls -la dist/

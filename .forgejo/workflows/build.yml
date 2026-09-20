@@ -1,8 +1,9 @@
 name: image
 
-# Builds a flashable postmarketOS image for the Fairphone 6 (kernel from
-# milos-linux combined-stable + imsd) and publishes it as the rolling
-# 'latest' release.
+# Builds the flashable postmarketOS images for the Fairphone 6 (kernel from
+# milos-linux combined-stable + imsd) — Plasma Mobile (fp6-img.tar.xz) and
+# Phosh (fp6-img-phosh.tar.xz) — and publishes both as the rolling 'latest'
+# release.
 #
 # Runs on the dedicated privileged runner label "pmos" (loop devices for
 # pmbootstrap install, qemu-user binfmt on the host for the aarch64 chroots).
@@ -34,8 +35,15 @@ jobs:
         with:
           persist-credentials: true
 
-      - name: Build image
+      - name: Build image (Plasma Mobile)
         run: ./build.sh
+
+      # Second UI from the same package builds (the kernel and the aports
+      # above are already current in pmbootstrap's work dir, so this is the
+      # install + export only): fp6-img-phosh.tar.xz next to fp6-img.tar.xz
+      # in the same release.
+      - name: Build image (Phosh)
+        run: FP6IMG_UI=phosh FP6IMG_KEEP_DIST=1 ./build.sh
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
