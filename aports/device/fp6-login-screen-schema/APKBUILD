@@ -1,0 +1,31 @@
+# GNOME Settings shows the Users page's "Fingerprint Login" row only when
+# GDM's org.gnome.login-screen schema exists and its
+# enable-fingerprint-authentication key is true (51.0,
+# panels/system/users/cc-user-page.c). The Phosh image logs in through
+# greetd/phrog, so without GDM the row never appears and no finger can be
+# enrolled from the GUI. This installs GDM's schema file unchanged, taken
+# from Alpine's gdm-48.0-r8, and nothing else of GDM. It is the only key
+# Settings reads from it, and nothing else on the image looks the schema up.
+# replaces="gdm" keeps one copy if GDM is ever installed as well: two
+# definitions of one schema make glib-compile-schemas fail for every schema.
+# glib's trigger on /usr/share/glib-2.0/schemas compiles it on install.
+maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
+pkgname=fp6-login-screen-schema
+pkgver=48.0
+pkgrel=0
+pkgdesc="GDM's org.gnome.login-screen schema without GDM, for GNOME Settings' fingerprint row"
+url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
+arch="noarch"
+license="GPL-2.0-or-later"
+replaces="gdm"
+options="!check"
+source="org.gnome.login-screen.gschema.xml"
+
+package() {
+	install -Dm644 "$srcdir"/org.gnome.login-screen.gschema.xml \
+		"$pkgdir"/usr/share/glib-2.0/schemas/org.gnome.login-screen.gschema.xml
+}
+
+sha512sums="
+7ff27457fb409cf7f235c2e075455aa62045d801c592dcd43ca786478d59ba7205d5a69ea84e4fc88ce2e43607d75d8587cec96df0513435ddd114258c331694  org.gnome.login-screen.gschema.xml
+"

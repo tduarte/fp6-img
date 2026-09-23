@@ -33,13 +33,14 @@ REGISTRY=https://forgejo.catcrafts.net/api/packages/Catcrafts/alpine/edge/fp6
 # FP6IMG_UI: which postmarketOS UI the image boots into. plasma-mobile (the
 # default) gets imsd-dialerd from the imsd package itself; phosh gets the
 # opt-in imsd-ofono subpackage (imsd-ofonod + the GNOME Calls plugin
-# override) on top. Everything else in the package set is UI-agnostic. The
+# override) and fp6-login-screen-schema (GNOME Settings' fingerprint row) on
+# top. Everything else in the package set is UI-agnostic. The
 # archive is named after it: fp6-img.tar.xz for plasma-mobile,
 # fp6-img-<ui>.tar.xz otherwise, so one release can carry both.
 FP6IMG_UI=${FP6IMG_UI:-plasma-mobile}
 case "$FP6IMG_UI" in
 plasma-mobile) UI_PACKAGES=; IMG_NAME=fp6-img ;;
-phosh)         UI_PACKAGES=,imsd-ofono; IMG_NAME=fp6-img-phosh ;;
+phosh)         UI_PACKAGES=,imsd-ofono,fp6-login-screen-schema; IMG_NAME=fp6-img-phosh ;;
 *) echo "FP6IMG_UI=$FP6IMG_UI: expected plasma-mobile or phosh" >&2; exit 1 ;;
 esac
 PMAPORTS_REPO=https://gitlab.postmarketos.org/postmarketOS/pmaports.git
@@ -159,6 +160,7 @@ cp -r aports/device/linux-postmarketos-qcom-milos "$WORK/pmaports/device/testing
 cp -r aports/device/soc-fairphone-fp6-audio "$WORK/pmaports/device/"
 cp -r aports/device/fp6-vendor-blobs "$WORK/pmaports/device/"
 cp -r aports/device/callaudioshim "$WORK/pmaports/device/"
+cp -r aports/device/fp6-login-screen-schema "$WORK/pmaports/device/"
 cp -r aports/device/fp6-device-tweaks "$WORK/pmaports/device/"
 cp -r aports/device/fp6-charging-mode "$WORK/pmaports/device/"
 cp -r aports/device/catcrafts-fp6-repo "$WORK/pmaports/device/"
