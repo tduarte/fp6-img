@@ -3,22 +3,27 @@
 # Earpiece port), leaving plasma-dialer's mute button dead and blocking
 # kde-telephony-daemon 25s per call; see the script header for the full
 # write-up. The callaudiod package stays installed (plasma-mobile depends on
-# it) — this shim simply owns org.mobian_project.CallAudio first via an
-# early-phase autostart, so D-Bus activation of the real daemon never fires.
-# Deployed and tested on the development FP6.
+# it); this package replaces its D-Bus activation file, so activating
+# org.mobian_project.CallAudio starts the shim in any session. Phosh
+# activates the name at startup, before autostart runs, and the stock daemon
+# used to win there (1-r0). Removing this package removes the activation file
+# too; 'apk fix callaudiod' restores callaudiod's. Deployed and tested on the
+# development FP6.
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=callaudioshim
 pkgver=1
-pkgrel=0
+pkgrel=1
 pkgdesc="callaudiod replacement shim: working in-call mic mute on the FP6"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
 arch="noarch"
 license="GPL-3.0-only"
 depends="python3 py3-dbus py3-gobject3 wireplumber"
+replaces="callaudiod"
 options="!check"
 source="
 	callaudioshim.py
 	callaudioshim.desktop
+	org.mobian_project.CallAudio.service
 "
 
 package() {
@@ -26,9 +31,12 @@ package() {
 		"$pkgdir"/usr/libexec/callaudioshim.py
 	install -Dm644 "$srcdir"/callaudioshim.desktop \
 		"$pkgdir"/etc/xdg/autostart/callaudioshim.desktop
+	install -Dm644 "$srcdir"/org.mobian_project.CallAudio.service \
+		"$pkgdir"/usr/share/dbus-1/services/org.mobian_project.CallAudio.service
 }
 
 sha512sums="
-7ca7d75402ea6c48a7c1c19c5c5ed6e556f2c0133aa6e32a12f5c5a1afc0c791f04ebd40102a4b92b0dd87f9330ae64ada025c344525b9ed17289acd8cb952d7  callaudioshim.py
+05995f0f732319559ccd9a7f3891c6363261e52ddbdf13b812fce580dbb816c362bd76da36cb9f1c7ee203d5ce2486762ffe46a7660dd4bc10c8bf2b4cd1a8ca  callaudioshim.py
 060b76660398115af26463425db5a6a2d634b6bdbf48a8ae488528403f8e086a9ef23470316196e6ccd8cb65e0ebd09bbc0df2ff5f8a830407d98404f439c706  callaudioshim.desktop
+6b44134e3f3ed0a8c3314b0b0cf9a9e5483850cdfb54f486d23199dd9f5f1ee66d674a391126e803796db69182f980b30a714457a81c9a447e146bc9ba5992bd  org.mobian_project.CallAudio.service
 "

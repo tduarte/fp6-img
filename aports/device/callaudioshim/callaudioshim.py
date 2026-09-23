@@ -37,9 +37,11 @@ interface (verified against callaudiod's org.mobian_project.CallAudio.xml):
     dynamic in this setup — journal/audio.md 2026-07-18). SpeakerState
     defaults to ON. When an Earpiece UCM device exists these become real.
 
-Stock callaudiod must not own the name: pkill it and mask its D-Bus
-activation (see journal/ims.md s44 deploy notes). Runs as the session user
-(autostart .desktop), no root needed.
+Stock callaudiod must not own the name. The package replaces callaudiod's
+D-Bus activation file with one that starts this shim, so whichever client asks
+first — Phosh activates the name at startup, before autostart runs — gets the
+shim; the KDE early-phase autostart stays for the DialerUtils push at session
+start. Runs as the session user, no root needed.
 """
 import subprocess
 
@@ -185,7 +187,12 @@ class CallAudio(dbus.service.Object):
 def main():
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     session = dbus.SessionBus()
-    name = dbus.service.BusName(BUS_NAME, session, do_not_queue=True)  # noqa: F841
+    try:
+        name = dbus.service.BusName(BUS_NAME, session, do_not_queue=True)  # noqa: F841
+    except dbus.exceptions.NameExistsException:
+        # activated and autostarted in the same session: the first one serves
+        log(f"callaudioshim: {BUS_NAME} already owned; exiting")
+        return
     CallAudio(session)
     log(f"callaudioshim: owning {BUS_NAME}")
     GLib.MainLoop().run()
