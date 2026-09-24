@@ -7,14 +7,19 @@
 #    fallback-only DT node, so udev coldplug never autoloads it
 #  - accel poll udev rule: inv_icm42600 exposes scan_elements without a
 #    trigger; iio-sensor-proxy must use its poll backend or auto-rotate is dead
-#  - iio-sensor-proxy restart drop-in: revives it after the known boot-time
-#    libssc crash on unconfigured SSC
+#  - no-SSC udev rule: iio-sensor-proxy 3.9 tags fastrpc-adsp for its libssc
+#    drivers; the compass discover() probes the absent SSC registry ~100 s at
+#    start and a proximity claim in that window is registered but never
+#    polled (near stuck false), a second one crashes it. No hexagonrpcd here;
+#    the sensors are IIO
+#  - iio-sensor-proxy restart drop-in: generic on-failure safety net; the
+#    boot-time libssc crash it was written for is prevented by the rule above
 #  - modem-gnss drop-in: this modem's LOC engine answers QMI 94 NotSupported
 #    to NMEA-type config, which is permanent, so pmOS's modem-gnss.service
 #    retried it every 30 s forever (its StartLimit never trips)
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=fp6-device-tweaks
-pkgver=4
+pkgver=5
 pkgrel=0
 pkgdesc="Fairphone 6 device-critical system configuration"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
@@ -30,6 +35,7 @@ source="
 	81-fp6-accel-poll.rules
 	iio-sensor-proxy-restart.conf
 	modem-gnss-nmea-optional.conf
+	91-fp6-no-ssc-sensors.rules
 "
 
 package() {
@@ -45,6 +51,8 @@ package() {
 		"$pkgdir"/etc/systemd/system/iio-sensor-proxy.service.d/restart.conf
 	install -Dm644 "$srcdir"/modem-gnss-nmea-optional.conf \
 		"$pkgdir"/etc/systemd/system/modem-gnss.service.d/10-nmea-types-optional.conf
+	install -Dm644 "$srcdir"/91-fp6-no-ssc-sensors.rules \
+		"$pkgdir"/etc/udev/rules.d/91-fp6-no-ssc-sensors.rules
 }
 
 sha512sums="
@@ -52,4 +60,5 @@ sha512sums="
 cc13f6abc4538fef976c59893992dd2c193cd0eac5da37a9fb01ba421b3ba8ff303aa438ec2fe4d10f50165f90be211d4b2c39dc6ef58d0d320fba8182ccf287  81-fp6-accel-poll.rules
 1800ad5c11b4e38c10b0c72b2392a6dc978a4e37bcd964182adb90d7d9aa7afc74acf102e2051dbf864021c05821f683af8943e2729e1eaa195856a0bd635e09  iio-sensor-proxy-restart.conf
 8fec832be59ca616d3e6a4c0a5ef8067d25f767c79155d8b0ef5761b8d21532932235a3236807305937029efe6255a16696d05523e3e654e2dc2212a281fe12c  modem-gnss-nmea-optional.conf
+1c5fd4a5a2a2c19165dca1381c8c6550fb61c6311561be450c9c6f88046d7649e4c7c6f4a86b163a2ecc1ef5ec93cc1dac1e2aded933a6b3d6d68292a1b609d0  91-fp6-no-ssc-sensors.rules
 "
