@@ -20,7 +20,7 @@
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=fp6-device-tweaks
 pkgver=5
-pkgrel=0
+pkgrel=1
 pkgdesc="Fairphone 6 device-critical system configuration"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
 arch="noarch"
@@ -58,7 +58,7 @@ package() {
 sha512sums="
 5e60fef47cb09cec7cab73464183dfd9e9cb32cebd1d20a67922c10c5a747eca8d106b66737d06af5c5c162a6baf37ab62a82709cc20911044face100d482919  inv-icm42600.conf
 cc13f6abc4538fef976c59893992dd2c193cd0eac5da37a9fb01ba421b3ba8ff303aa438ec2fe4d10f50165f90be211d4b2c39dc6ef58d0d320fba8182ccf287  81-fp6-accel-poll.rules
-1800ad5c11b4e38c10b0c72b2392a6dc978a4e37bcd964182adb90d7d9aa7afc74acf102e2051dbf864021c05821f683af8943e2729e1eaa195856a0bd635e09  iio-sensor-proxy-restart.conf
+f74c6c5d0ba3015cf123808452e9677c1d087e9540ea7037c30316e48a5c5bbdafe712ff0b07f17969337b1576a34cdfef4319c464ffe38c092a67d313129b57  iio-sensor-proxy-restart.conf
 8fec832be59ca616d3e6a4c0a5ef8067d25f767c79155d8b0ef5761b8d21532932235a3236807305937029efe6255a16696d05523e3e654e2dc2212a281fe12c  modem-gnss-nmea-optional.conf
 1c5fd4a5a2a2c19165dca1381c8c6550fb61c6311561be450c9c6f88046d7649e4c7c6f4a86b163a2ecc1ef5ec93cc1dac1e2aded933a6b3d6d68292a1b609d0  91-fp6-no-ssc-sensors.rules
 "
