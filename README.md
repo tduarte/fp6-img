@@ -3,9 +3,7 @@
 Flashable [postmarketOS](https://postmarketos.org/) images for the
 **Fairphone 6/6+**, built nightly from the
 [Catcrafts milos-linux](https://forgejo.catcrafts.net/Catcrafts/milos-linux)
-`combined-stable` kernel branch, with
-[imsd](https://forgejo.catcrafts.net/Catcrafts/imsd) (userspace VoLTE)
-preinstalled.
+`combined-stable` kernel branch.
 
 Maintained by [Jorijn van der Graaf](https://catcrafts.net/about)
 (TheMightyCat) at [Catcrafts](https://catcrafts.net/).
@@ -16,7 +14,7 @@ Everything on the `combined-stable` branch: display, touch, wifi, cellular
 data, NFC (reader), speaker audio, microphone, IMU, magnetometer, barometer,
 ambient light/proximity, fingerprint unlock through
 [fingerprintd](https://forgejo.catcrafts.net/Catcrafts/fingerprintd), plus
-VoLTE calls (both directions) through imsd.
+VoLTE calls (both directions) through [imsd](https://forgejo.catcrafts.net/Catcrafts/imsd).
 
 ## Flashing
 
@@ -39,18 +37,3 @@ NV back and reports the result. The bootloader never writes `boot`.
 
 Default login: `user` / `147147` (same as official postmarketOS images). 
 **Never re-lock the bootloader** with a custom image installed.
-
-## VoLTE configuration
-
-imsd is installed but needs your carrier's P-CSCF address:
-
-```sh
-# /etc/imsd.env
-PCSCF=<your carrier's P-CSCF IPv6 address>
-```
-
-Find it via android adb using `adb shell dumpsys telephony.registry`, then
-`systemctl restart imsd` (the service is enabled at boot and waits for this
-file to exist). See the
-[imsd README](https://forgejo.catcrafts.net/Catcrafts/imsd) for the full
-variable reference and carrier assumptions.

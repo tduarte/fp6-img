@@ -167,6 +167,5 @@ ssh $SSHOPTS -O exit "user@$PHONE" 2>/dev/null || true
 cat <<'EOF'
 
 DONE. The phone reboots into postmarketOS from its own boot partition.
-Log in as user / 147147. For VoLTE, write your carrier's
-P-CSCF into /etc/imsd.env and restart imsd - see the README.
+Log in as user / 147147.
 EOF
