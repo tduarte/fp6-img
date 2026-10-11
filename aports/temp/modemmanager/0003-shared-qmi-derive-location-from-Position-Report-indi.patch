@@ -1,8 +1,7 @@
-From 7566587e77d299ab0f67613ae03cab9973e351db Mon Sep 17 00:00:00 2001
+From 59f2f17246a844e07569e2ee6523c810364e1e52 Mon Sep 17 00:00:00 2001
 From: Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>
 Date: Thu, 2 Jul 2026 15:44:16 +0200
-Subject: [PATCH 3/3] shared-qmi: derive location from Position Report
- indications
+Subject: [PATCH] shared-qmi: derive location from Position Report indications
 
 Some GNSS engines (e.g. gnss8 in the SM7635/Fairphone 6) report fixes
 only via QMI_LOC Position Report indications and never emit NMEA (Set
@@ -43,7 +42,7 @@ Signed-off-by: Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>
  1 file changed, 147 insertions(+)
 
 diff --git a/src/mm-shared-qmi.c b/src/mm-shared-qmi.c
-index 09aa987a..cad75080 100644
+index 25990ceb..d2eefb26 100644
 --- a/src/mm-shared-qmi.c
 +++ b/src/mm-shared-qmi.c
 @@ -88,6 +88,8 @@ typedef struct {
@@ -64,7 +63,7 @@ index 09aa987a..cad75080 100644
      if (priv->loc_assistance_inject_time_req_indication_id)
          g_signal_handler_disconnect (priv->loc_client, priv->loc_assistance_inject_time_req_indication_id);
      if (priv->loc_assistance_inject_position_req_indication_id)
-@@ -5161,6 +5165,10 @@ loc_stop_ready (QmiClientLoc *client,
+@@ -5167,6 +5171,10 @@ loc_stop_ready (QmiClientLoc *client,
              g_signal_handler_disconnect (priv->loc_client, priv->loc_location_nmea_indication_id);
              priv->loc_location_nmea_indication_id = 0;
          }
@@ -75,7 +74,7 @@ index 09aa987a..cad75080 100644
          g_clear_object (&priv->loc_client);
      }
  
-@@ -5264,11 +5272,142 @@ loc_location_nmea_indication_cb (QmiClientLoc               *client,
+@@ -5270,11 +5278,142 @@ loc_location_nmea_indication_cb (QmiClientLoc               *client,
      if (!nmea)
          return;
  
@@ -218,7 +217,7 @@ index 09aa987a..cad75080 100644
  /*****************************************************************************/
  /* Location: internal helper: setup minimum required NMEA traces */
  
-@@ -5662,6 +5801,7 @@ gps_engine_loc_register_events (QmiClientLoc *client,
+@@ -5668,6 +5807,7 @@ gps_engine_loc_register_events (QmiClientLoc *client,
      guint64                           event_mask;
  
      event_mask = QMI_LOC_EVENT_REGISTRATION_FLAG_NMEA |
@@ -226,7 +225,7 @@ index 09aa987a..cad75080 100644
                   QMI_LOC_EVENT_REGISTRATION_FLAG_INJECT_TIME_REQUEST |
                   QMI_LOC_EVENT_REGISTRATION_FLAG_INJECT_POSITION_REQUEST;
      input = qmi_message_loc_register_events_input_new ();
-@@ -5713,12 +5853,19 @@ loc_start_ready (QmiClientLoc *client,
+@@ -5719,12 +5859,19 @@ loc_start_ready (QmiClientLoc *client,
  
      g_assert (!priv->loc_client);
      g_assert (!priv->loc_location_nmea_indication_id);

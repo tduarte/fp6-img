@@ -1,7 +1,7 @@
-From 2924dab906b3dc9e3b48e766637618ce53615c23 Mon Sep 17 00:00:00 2001
+From d9e93ad09b75ec2813a01bbb07794a5c85a3a56d Mon Sep 17 00:00:00 2001
 From: Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>
 Date: Thu, 2 Jul 2026 15:30:48 +0200
-Subject: [PATCH 2/3] shared-qmi: unlock AFW-gated GNSS engines at LOC start
+Subject: [PATCH] shared-qmi: unlock AFW-gated GNSS engines at LOC start
 
 Newer Snapdragon GNSS engines (e.g. gnss8 in the SM7635/Fairphone 6)
 only allow positioning for clients registered as application framework
@@ -44,10 +44,10 @@ Signed-off-by: Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>
  2 files changed, 86 insertions(+), 55 deletions(-)
 
 diff --git a/meson.build b/meson.build
-index 3cf29e80..e5e3d0be 100644
+index 9b8ab2d1..1bb10b94 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -277,7 +277,7 @@ config_h.set('WITH_MBIM', enable_mbim)
+@@ -297,7 +297,7 @@ config_h.set('WITH_MBIM', enable_mbim)
  # QMI support (enabled by default)
  enable_qmi = get_option('qmi')
  if enable_qmi
@@ -57,10 +57,10 @@ index 3cf29e80..e5e3d0be 100644
  
    if not qmi_glib_dep.found() and get_option('subproject-fallback')
 diff --git a/src/mm-shared-qmi.c b/src/mm-shared-qmi.c
-index d93698a6..09aa987a 100644
+index f578d876..25990ceb 100644
 --- a/src/mm-shared-qmi.c
 +++ b/src/mm-shared-qmi.c
-@@ -5646,33 +5646,67 @@ pds_gps_service_state_start_ready (QmiClientPds *client,
+@@ -5652,33 +5652,67 @@ pds_gps_service_state_start_ready (QmiClientPds *client,
      qmi_message_pds_set_auto_tracking_state_input_unref (input);
  }
  
@@ -142,7 +142,7 @@ index d93698a6..09aa987a 100644
  
      self = g_task_get_source_object (task);
      priv = get_private (self);
-@@ -5691,16 +5725,16 @@ loc_register_events_ready (QmiClientLoc *client,
+@@ -5697,16 +5731,16 @@ loc_register_events_ready (QmiClientLoc *client,
  }
  
  static void
@@ -167,7 +167,7 @@ index d93698a6..09aa987a 100644
      if (!output) {
          g_prefix_error (&error, "QMI operation failed: ");
          g_task_return_error (task, error);
-@@ -5708,32 +5742,40 @@ loc_start_ready (QmiClientLoc *client,
+@@ -5714,32 +5748,40 @@ loc_start_ready (QmiClientLoc *client,
          return;
      }
  
@@ -226,7 +226,7 @@ index d93698a6..09aa987a 100644
  static void
  start_gps_engine (MMSharedQmi         *self,
                    GAsyncReadyCallback  callback,
-@@ -5771,20 +5813,9 @@ start_gps_engine (MMSharedQmi         *self,
+@@ -5777,20 +5819,9 @@ start_gps_engine (MMSharedQmi         *self,
                                          MM_PORT_QMI_FLAG_DEFAULT,
                                          NULL);
      if (client) {
