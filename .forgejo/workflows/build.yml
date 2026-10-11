@@ -52,14 +52,17 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-      # Ship every locally built apk (kernel, modemmanager, libqmi,
-      # callaudioshim, audio files, ...) to the Forgejo Alpine registry, so
+      # Ship every locally built apk (kernel, modemmanager, callaudioshim,
+      # audio files, ...) to the Forgejo Alpine registry, so
       # installed systems get updates via 'apk upgrade' instead of losing
       # the FP6 patches to the next upstream version bump. Requires the
       # PACKAGE_TOKEN repo secret (catbot account, package:write scope);
       # skips quietly until it exists. 409 = same version already published.
       # imsd and fingerprintd are skipped: build.sh 3b took them FROM the
       # registry (re-signed for the chroot), so they are not ours to publish.
+      # libqmi is skipped too: its fork was retired and deleted from the
+      # registry (2026-10-12); should a leftover apk ever sit in the runner's
+      # package dir, it must not bring the fork back.
       - name: Publish packages to the apk registry
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
@@ -74,6 +77,7 @@ jobs:
             [ -e "$f" ] || continue
             case "$(basename "$f")" in
               imsd-*|fingerprintd-*) echo "registry-sourced, not republished: $(basename "$f")"; continue ;;
+              libqmi-*|qmi-utils-*) echo "retired fork, not republished: $(basename "$f")"; continue ;;
             esac
             found=1
             code=$(curl -s -o /dev/null -w '%{http_code}' \

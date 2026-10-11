@@ -1,7 +1,7 @@
 # Enables the Catcrafts FP6 package repository on the installed system:
 # installs the Forgejo package-registry signing key and appends the repo URL
 # to /etc/apk/repositories. With this, 'apk upgrade' pulls the CI-published
-# kernel/modemmanager/libqmi/imsd builds instead of losing the FP6 patches
+# kernel/modemmanager/imsd builds instead of losing the FP6 patches
 # to the next upstream version bump.
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=catcrafts-fp6-repo

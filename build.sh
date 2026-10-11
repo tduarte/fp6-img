@@ -153,7 +153,6 @@ clone_retry "$WORK/pmaports" -q --depth=1 "$PMAPORTS_REPO"
 rm -rf "$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos" \
        "$WORK/pmaports/main/postmarketos-config-nftables" \
        "$WORK/pmaports/temp/libcamera" \
-       "$WORK/pmaports/temp/libqmi" \
        "$WORK/pmaports/temp/modemmanager"
 mkdir -p "$WORK/pmaports/temp"
 cp -r aports/device/linux-postmarketos-qcom-milos "$WORK/pmaports/device/testing/"
@@ -166,9 +165,9 @@ cp -r aports/device/fp6-charging-mode "$WORK/pmaports/device/"
 cp -r aports/device/catcrafts-fp6-repo "$WORK/pmaports/device/"
 cp -r aports/main/postmarketos-config-nftables "$WORK/pmaports/main/"
 # imsd has no aport here at all: section 3b installs the published apk.
-# Alpine forks carrying the GNSS patches (libqmi !470 unreleased; MM !1463
-# draft) - deps of modemmanager/imsd, built from aports because r100 > repo.
-cp -r aports/temp/libqmi "$WORK/pmaports/temp/"
+# Alpine fork carrying the GNSS patches (MM !1463, draft), built from aports
+# because r101 > repo. libqmi needs no fork any more: Alpine's snapshot
+# (1.38.0_git20261005) is past the !470 merge.
 cp -r aports/temp/modemmanager "$WORK/pmaports/temp/"
 # pmOS libcamera fork + the FP6 OV13B10 sensor-helper/properties patches
 # (r2 > pmOS r1)
@@ -191,7 +190,7 @@ sed -i "s/^_commit=.*/_commit=\"$COMMIT\"/" "$KAPORT/APKBUILD"
 KDATE=$(git -C "$WORK/milos-src" log -1 --format=%cd --date=format:%Y%m%d)
 sed -i "s/^pkgver=\([0-9.]*\)\$/pkgver=\1_git$KDATE/" "$KAPORT/APKBUILD"
 
-# Same dance for the gitlab.freedesktop.org packages (libqmi, modemmanager,
+# Same dance for the gitlab.freedesktop.org packages (modemmanager,
 # libcamera): their pinned tarballs came from fd.o's on-demand archive
 # endpoint, which 503/504s for hours at a stretch — runs #25, #27, #30 and
 # #31 all died there, outlasting any in-run retry. git clone is served from
@@ -209,9 +208,6 @@ fdo_tarball() { # fdo_tarball <repo url> <aport dir> <tarball dirname> <ref>
 }
 
 FDO=https://gitlab.freedesktop.org
-QMI_COMMIT=$(apkbuild_var "$WORK/pmaports/temp/libqmi" _commit)
-fdo_tarball "$FDO/mobile-broadband/libqmi.git" \
-	"$WORK/pmaports/temp/libqmi" "libqmi-$QMI_COMMIT" "$QMI_COMMIT"
 MM_COMMIT=$(apkbuild_var "$WORK/pmaports/temp/modemmanager" _commit)
 fdo_tarball "$FDO/mobile-broadband/ModemManager.git" \
 	"$WORK/pmaports/temp/modemmanager" "ModemManager-$MM_COMMIT" "$MM_COMMIT"
@@ -239,12 +235,28 @@ systemd = always
 extra_packages = soc-fairphone-fp6-audio,callaudioshim,imsd,fingerprintd,fingerprintd-systemd,fingerprintd-agent,fp6-device-tweaks,fp6-charging-mode,catcrafts-fp6-repo,postmarketos-base-ui-audio-backend-pipewire,pipewire-pulse,pipewire-echo-cancel$UI_PACKAGES
 EOF
 
-# All four source tarballs are generated locally above, so every checksum
+# The local package repository under $WORKDIR is consulted before every
+# other repository. Whether it survives from one CI run to the next is not
+# established (run 60 rebuilt the packages run 58 had built, which says it
+# did not), but nothing guarantees it either way, and a package nobody builds
+# any more would win over Alpine's in the builds and in the images: the
+# libqmi fork, retired 2026-10-12, as 1.39.1_git20260808. Delete its apks
+# from every channel and rebuild the index from the files present (an index
+# naming missing apks fails the next apk run), then make sure none is left. pmbootstrap's own 'zap --pkgs-local-mismatch' is no use here:
+# with systemd selected it reads packages/systemd-edge, while the builds
+# land in packages/edge. The dir belongs to the chroot uid (see 3b).
+if [ -d "$WORKDIR/packages" ]; then
+	sudo find "$WORKDIR/packages" -name '*.apk' \( -name 'libqmi-*' -o -name 'qmi-utils-*' \) -delete
+	retry "re-index local packages" pmbootstrap index
+	left=$(sudo find "$WORKDIR/packages" -name '*.apk' \( -name 'libqmi-*' -o -name 'qmi-utils-*' \))
+	[ -z "$left" ] || { echo "retired libqmi fork still in the local repository:" >&2; echo "$left" >&2; exit 1; }
+fi
+
+# All three source tarballs are generated locally above, so every checksum
 # step is offline. libcamera needs a checksum step now too: its committed
 # sums were for the fd.o-served tarball, and git-archive output is not
 # byte-identical to it (verified: sha512 differs).
 pmbootstrap checksum linux-postmarketos-qcom-milos
-pmbootstrap checksum libqmi
 pmbootstrap checksum modemmanager
 pmbootstrap checksum libcamera
 
@@ -255,11 +267,8 @@ pmbootstrap checksum libcamera
 # kernel is unaffected either way (cross-native, no crossdirect).
 NOCROSS=${FP6IMG_NO_CROSSDIRECT:+--no-cross}
 
-# pmbootstrap's install-time build plan is not dependency-ordered (it tried
-# building modemmanager before the libqmi its makedepends require); build
-# the GNSS stack bottom-up explicitly. 'pmbootstrap build' is a no-op when
-# the package is already current.
-retry "build libqmi" pmbootstrap $NOCROSS build --arch aarch64 libqmi
+# Build the patched packages explicitly ('pmbootstrap build' is a no-op when
+# the package is already current).
 retry "build modemmanager" pmbootstrap $NOCROSS build --arch aarch64 modemmanager
 # libcamera is no makedepend of anything here - build it explicitly so the
 # patched -r2 exists for the publish step even if the install set resolves
