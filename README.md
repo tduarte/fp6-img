@@ -20,21 +20,18 @@ VoLTE calls (both directions) through imsd.
 
 ## Flashing
 
-Download `fp6-img.tar.xz` from the latest release and unlock the bootloader
+Download `fp6-img-{DE}.tar.xz` with your preferred DE from the latest release
+(`{DE}` is `plasma` for Plasma Mobile, calls through Plasma Dialer, or `phosh` for
+Phosh, calls through GNOME Calls) and unlock the bootloader
 ([Fairphone's official process](https://support.fairphone.com/hc/en-us/articles/10492476238737)).
 
 **Install**: with the phone in fastboot mode,
 
 ```sh
-tar xf fp6-img.tar.xz
-cd fp6-img
+tar xf fp6-img-{DE}.tar.xz
+cd fp6-img-{DE}
 ./install.sh
 ```
-
-Two images are published per release, same kernel and packages, different
-shell: `fp6-img.tar.xz` boots **Plasma Mobile** (calls through Plasma
-Dialer), `fp6-img-phosh.tar.xz` boots **Phosh** (calls through GNOME Calls,
-via imsd's `imsd-ofono` backend). Pick one; the install steps are identical.
 
 `install.sh` erases dtbo, flashes the rootfs, **RAM-boots** the kernel, writes the boot partition from
 inside Linux where the bootloader's NV-wipe cannot see it, then reads the modem
