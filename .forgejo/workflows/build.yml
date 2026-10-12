@@ -1,6 +1,6 @@
 name: image
 
-# Builds the flashable postmarketOS images for the Fairphone 6 (kernel from
+# Builds the flashable Nura images for the Fairphone 6 (kernel from
 # milos-linux combined-stable + imsd) — Plasma Mobile (fp6-img-plasma.tar.xz) and
 # Phosh (fp6-img-phosh.tar.xz) — and publishes both as the rolling 'latest'
 # release.
@@ -106,7 +106,7 @@ jobs:
           url: ${{ github.server_url }}
           repo: ${{ github.repository }}
           tag: latest
-          title: Latest FP6 postmarketOS image
+          title: Latest FP6 Nura image
           prerelease: true
           override: true
           release-dir: dist

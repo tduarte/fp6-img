@@ -1,7 +1,7 @@
 # fp6-img
 
-Flashable [postmarketOS](https://postmarketos.org/) images for the
-**Fairphone 6/6+**, built nightly from the
+Flashable [Nura](https://nura.eco) images for the
+**Fairphone 6/6+**, built from the
 [Catcrafts milos-linux](https://forgejo.catcrafts.net/Catcrafts/milos-linux)
 `combined-stable` kernel branch.
 
@@ -36,5 +36,5 @@ cd fp6-img-{DE}
 inside Linux where the bootloader's NV-wipe cannot see it, then reads the modem
 NV back and reports the result. The bootloader never writes `boot`.
 
-Default login: `user` / `147147` (same as official postmarketOS images). 
+Default login: `user` / `147147` (same as official Nura images). 
 **Never re-lock the bootloader** with a custom image installed.

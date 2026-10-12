@@ -1,5 +1,5 @@
 #!/bin/sh -eu
-# fp6-img pipeline: build a flashable postmarketOS image for the Fairphone 6
+# fp6-img pipeline: build a flashable Nura image for the Fairphone 6
 # with the Catcrafts kernel (milos-linux combined-stable), imsd (VoLTE) and
 # fingerprintd (fingerprint unlock)
 # installed from the Catcrafts apk registry.
@@ -30,7 +30,7 @@ KERNEL_BRANCH=combined-stable
 # sha256; that gated fresh installs only, never upgrades, and cost a commit
 # and an image run per release.
 REGISTRY=https://forgejo.catcrafts.net/api/packages/Catcrafts/alpine/edge/fp6
-# FP6IMG_UI: which postmarketOS UI the image boots into. plasma-mobile (the
+# FP6IMG_UI: which Nura UI the image boots into. plasma-mobile (the
 # default) gets imsd-dialerd from the imsd package itself; phosh gets the
 # opt-in imsd-ofono subpackage (imsd-ofonod + the GNOME Calls plugin
 # override) and fp6-login-screen-schema (GNOME Settings' fingerprint row) on
@@ -330,7 +330,7 @@ rm -f "$REG_DL"/*.apk
 pmbootstrap index
 
 # --- 4. build the image -------------------------------------------------------
-# Same default credentials as the official postmarketOS images.
+# Same default credentials as the official Nura images.
 pmbootstrap -y zap >/dev/null 2>&1 || true
 pmbootstrap install --password 147147
 
@@ -358,7 +358,7 @@ cp README.md install.sh "$STAGE/$IMG_NAME/"
 	echo "kernel:        $KERNEL_REPO $KERNEL_BRANCH @ $COMMIT"
 	echo "ui:            $FP6IMG_UI"
 	echo "built:         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-	echo "default login: user / 147147 (same as official postmarketOS images)"
+	echo "default login: user / 147147 (same as official Nura images)"
 	while read -r _n _v _s; do
 		printf '%-14s %s %s-%s (newest registry package, sha256 %s)\n' "$_n:" "$REGISTRY" "$_n" "$_v" "$_s"
 	done < "$REG_DL/manifest"

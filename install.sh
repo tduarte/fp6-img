@@ -50,7 +50,7 @@ printf '%s' "$DEVINFO" | grep -q "Device unlocked: true" || \
        then re-run. Note that unlocking wipes the phone."
 
 cat <<'EOF'
-This will replace the operating system on the connected Fairphone 6 with catcrafts patched postmarketos. Keep the phone connected on USB for the entirety of this script's duration. 
+This will replace the operating system on the connected Fairphone 6 with the Catcrafts build of Nura. Keep the phone connected on USB for the entirety of this script's duration. 
 If this has been usefull please consider donating at https://catcrafts.net/shop/donation
 WARNING: This is a early version of the install script for power users ahead of the official release, while tested this has not been trough the strict quality control the offical release will have.
 Press Enter to continue, Ctrl-C to abort.
@@ -151,7 +151,7 @@ Z=$(ssh $SSHOPTS "user@$PHONE" \
 if [ "$Z" -le 2 ]; then
 	cat <<'EOF'
 WARNING: the modem NV reads empty. If this device previously ran stock
-Android, its factory copy (fsg) is still on the device but postmarketOS
+Android, its factory copy (fsg) is still on the device but Nura
 cannot restore from it yet - see the README's modem section. If you have a
 modemst backup, dd it back now.
 EOF
@@ -166,6 +166,6 @@ ssh $SSHOPTS -O exit "user@$PHONE" 2>/dev/null || true
 
 cat <<'EOF'
 
-DONE. The phone reboots into postmarketOS from its own boot partition.
+DONE. The phone reboots into Nura from its own boot partition.
 Log in as user / 147147.
 EOF
