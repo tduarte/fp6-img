@@ -18,7 +18,8 @@ VoLTE calls (both directions) through [imsd](https://forgejo.catcrafts.net/Catcr
 
 ## Flashing
 
-Download `fp6-img-{DE}.tar.xz` with your preferred DE from the latest release
+Download `fp6-img-{DE}.tar.xz` with your preferred DE from the
+[`latest` release](https://forgejo.catcrafts.net/Catcrafts/fp6-img/releases/tag/latest)
 (`{DE}` is `plasma` for Plasma Mobile, calls through Plasma Dialer, or `phosh` for
 Phosh, calls through GNOME Calls) and unlock the bootloader
 ([Fairphone's official process](https://support.fairphone.com/hc/en-us/articles/10492476238737)).
