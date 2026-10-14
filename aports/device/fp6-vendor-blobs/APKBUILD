@@ -12,28 +12,33 @@
 # drops a previously-shipped blob restores the file immediately instead of
 # at the next boot (--refresh in addition for an mbn consumer: it re-derives
 # the trustlet from the active slot even if a file is present). Consumers:
-# soc-fairphone-fp6-audio (aw88261 acf), fingerprintd (focal64 trustlet).
+# soc-fairphone-fp6-audio (aw88261 acf), fingerprintd (focal64 trustlet);
+# this package's own 30-ath11k-board-data fragment (WLAN board data).
 #
 # 1-r3 (2026-09-11): active slot first, an unpinned ('-') structurally
 # verified mode for mbn, --refresh -- after two field units got no
 # fingerprint sensor from a whole-image hash pin that can only match one
 # Android build (fp6 repo journal/blobs/, journal/fingerprint/).
+# 1-r4 (2026-10-14): the ath11k-bdf directive -- the WLAN board data the
+# device tree asks for, built on-device from the stock modem partition
+# (the FP6 Plus does not associate on upstream's generic data).
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=fp6-vendor-blobs
 pkgver=1
-pkgrel=3
+pkgrel=4
 pkgdesc="On-device extraction of vendor blobs from the stock Android partitions"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
 arch="noarch"
 license="GPL-3.0-only"
 # fallback mapper for when the initramfs didn't map the dynamic partitions
-depends="make-dynpart-mappings"
+depends="make-dynpart-mappings zstd"
 install="$pkgname.post-upgrade"
 options="!check"
 source="
 	fp6-vendor-blobs-extract
 	fp6-vendor-blobs.service
 	fp6-vendor-blobs.preset
+	30-ath11k-board-data.manifest
 "
 
 package() {
@@ -42,8 +47,9 @@ package() {
 	install -Dm644 "$srcdir"/fp6-vendor-blobs.service \
 		"$pkgdir"/usr/lib/systemd/system/fp6-vendor-blobs.service
 	# enabled unconditionally: the unit is a fast no-op once every manifest
-	# dest exists, and blobs appearing on first boot must not depend on a
-	# manual systemctl enable. sysinit = the real (pre-coldplug) run;
+	# dest exists and every ath11k-bdf override is current against its base,
+	# and blobs appearing on first boot must not depend on a manual
+	# systemctl enable. sysinit = the real (pre-coldplug) run;
 	# multi-user = the post-udev retry if the early run failed (see unit)
 	mkdir -p "$pkgdir"/etc/systemd/system/sysinit.target.wants \
 		"$pkgdir"/etc/systemd/system/multi-user.target.wants
@@ -58,11 +64,13 @@ package() {
 	# extracted, no sound card. See journal/blobs/ 2026-08-28.
 	install -Dm644 "$srcdir"/fp6-vendor-blobs.preset \
 		"$pkgdir"/usr/lib/systemd/system-preset/50-fp6-vendor-blobs.preset
-	mkdir -p "$pkgdir"/usr/share/fp6-vendor-blobs/manifest.d
+	install -Dm644 "$srcdir"/30-ath11k-board-data.manifest \
+		"$pkgdir"/usr/share/fp6-vendor-blobs/manifest.d/30-ath11k-board-data.manifest
 }
 
 sha512sums="
-e9618b4a1ccbe0913a608b32a1a9e87337e3da79a3d7ccc7f49292ae9aaa9406d2ea9817d63b3cfff2c4346b80dd2476c10725f4f0f95c859acd17b22ec03a16  fp6-vendor-blobs-extract
+6aee5f56bc7bc960537b7ca1069305b56a5ec8da99a58298ba1715e93f002d391a2bd24be78214428b0297f9e3cfd1003a243c76a2d08397dcac63a7d800d302  fp6-vendor-blobs-extract
 b4c290095d9f39515378dfef08de720ce49324210342aa13c131dfce1103785e796e6f821f0c659671a4c44b46f466ce0e03f11f216fdcdee2a99db5e7970800  fp6-vendor-blobs.service
 9e79dd0aed13f11a71282aa24b2a26331e85c105e25ab0c0fed6189b8c300769a5f4308b18b91d9855868d658ad3a57c03e26c9b11bd27fd5e03f9a5decbbd6a  fp6-vendor-blobs.preset
+f13d7b384a9b577762693c6831fbf28cb9e92e4f943af1917ddeba121c582f0c85c81a3e01e8e9ff6367c3717b6c37743f019db297f75339871292cf816bfc91  30-ath11k-board-data.manifest
 "

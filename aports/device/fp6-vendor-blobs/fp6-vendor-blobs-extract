@@ -11,6 +11,7 @@
 #
 #   file <partition[,partition...]> <path-in-partition> <dest> <sha256>
 #   mbn  <partition[,partition...]> <dir-in-partition> <name> <dest> <sha256|->
+#   ath11k-bdf <partition[,partition...]> <path-in-partition> <entry-name> <base> <dest>
 #   rebind <bus> <device>
 #
 # Partition lists are tried in the order written, except that on an A/B
@@ -47,6 +48,24 @@
 #   itself and refuses a damaged or foreign image (one flipped byte ->
 #   ERROR_ELF_SIGNATURE_ERROR, measured 2026-09-03). The sha256 of what was
 #   installed is logged either way.
+# ath11k-bdf: the WLAN board data (calibration) the device tree asks ath11k
+#   for by name, e.g. bus=ahb,qmi-chip-id=1,qmi-board-id=255,variant=Fairphone_Gen_6.
+#   Upstream linux-firmware's board-2.bin carries no Fairphone entry, so the
+#   driver silently falls back to the generic board-id data; the FP6 Plus does
+#   not associate on it (user report 2026-10-14, fp6 repo journal/base/). The
+#   stock modem partition has the device's own file (image/qca6750/bdwlan.elf).
+#   This directive copies it and wraps it into a container at <dest> (the
+#   loader searches /lib/firmware/updates first): <base> (board-2.bin or
+#   board-2.bin.zst, every upstream entry kept byte for byte) + one BOARD
+#   entry named <entry-name> holding the ELF. Verified structurally (ELF
+#   magic, sane size, the container's own magic), never by a pinned hash:
+#   the ELF belongs to the stock modem image and can change with it.
+#   The driver takes the first BOARD entry whose name matches, so an entry
+#   upstream ships under the same name is used before the appended copy.
+#   The sha256 of the <base> used is kept in <dest>.fp6-base: a <base> that
+#   changed since (a linux-firmware upgrade) rebuilds <dest> at the next
+#   run, and so does --refresh. A rebuild that reproduces the existing
+#   <dest> byte for byte installs nothing and does not count as extracted.
 # rebind: if this fragment's run extracted at least one file, unbind and
 #   re-probe <device> on <bus> so the consuming driver picks the file up
 #   in the same boot. Unconditional on purpose: a still-bound consumer may
@@ -64,8 +83,9 @@
 # --if-device: exit 0 quietly when no stock super partition is visible
 #   (apk post-install scripts run inside build/CI chroots too; on images
 #   built there the first-boot service does the real extraction).
-# --refresh: re-derive every mbn dest even if it exists, replacing it only
-#   with an image that verifies (a failed refresh leaves the old file). For
+# --refresh: re-derive every mbn and ath11k-bdf dest even if it exists,
+#   replacing it only with an image that verifies (a failed refresh leaves
+#   the old file). For
 #   the consumer's post-install/post-upgrade: a fresh 'apk add' gets its
 #   trustlet without a reboot, and a trustlet that was hand-placed or pinned
 #   to another build is replaced by the active slot's on the next upgrade.
@@ -257,6 +277,76 @@ extract_mbn() { # <partition,...> <dir-in-partition> <name> <dest> <sha256|->
 	fail "no listed partition ($parts) yields $rname with sha256 $want - $dest NOT installed$kept"
 }
 
+# One little-endian u32 as four raw bytes (busybox printf, octal escapes).
+le32() { # <value>
+	printf "\\$(printf %03o $(($1 & 255)))\\$(printf %03o $((($1 >> 8) & 255)))\\$(printf %03o $((($1 >> 16) & 255)))\\$(printf %03o $((($1 >> 24) & 255)))"
+}
+pad4() { # <length> -> bytes of zero padding to the next multiple of 4, on stdout
+	n=$(( (4 - $1 % 4) % 4 ))
+	[ "$n" -gt 0 ] && head -c "$n" /dev/zero
+	return 0
+}
+# <dest>.fp6-base records the sha256 of the <base> <dest> was built from.
+bdf_base_id() { sha256sum "$1" | awk '{print $1}'; }
+bdf_current() { # <base> <dest> - true when <dest> exists and was built from this <base>
+	[ -f "$1" ] && [ -e "$2" ] && [ -f "$2.fp6-base" ] || return 1
+	read -r bh bs < "$2.fp6-base"
+	[ "$bh" = "$(bdf_base_id "$1")" ]
+}
+extract_ath11k_bdf() { # <partition,...> <path-in-partition> <entry-name> <base> <dest>
+	parts=$1 bsrc=$2 bname=$3 bbase=$4 bdest=$5
+	[ -f "$bbase" ] || fail "ath11k-bdf: base container $bbase missing"
+	bid=$(bdf_base_id "$bbase")
+	braw="$bdest.fp6-raw.$$"
+	mkdir -p "${bdest%/*}" || fail "cannot create ${bdest%/*}"
+	case "$bbase" in
+	*.zst) zstd -dcq "$bbase" > "$braw" 2>/dev/null || { rm -f "$braw"; fail "ath11k-bdf: cannot decompress $bbase"; } ;;
+	*) cp "$bbase" "$braw" || { rm -f "$braw"; fail "ath11k-bdf: cannot read $bbase"; } ;;
+	esac
+	[ "$(head -c 16 "$braw")" = "QCA-ATH11K-BOARD" ] || { rm -f "$braw"; fail "ath11k-bdf: $bbase is not a QCA-ATH11K-BOARD container"; }
+	# the driver walks the entries 4-byte aligned; an entry appended to an
+	# unaligned base would be misread and the generic data used silently
+	bsz=$(fsize "$braw")
+	[ $(( bsz % 4 )) -eq 0 ] || { rm -f "$braw"; fail "ath11k-bdf: $bbase is $bsz bytes, not a multiple of 4"; }
+	for part in $(order_parts "$parts"); do
+		mount_part "$part" || { log "$part: not mountable, trying next"; continue; }
+		elf="$MNT/$bsrc"
+		[ -f "$elf" ] || { log "$part: no $bsrc, trying next"; continue; }
+		esz=$(fsize "$elf")
+		[ "$(hex4 "$elf")" = 7f454c46 ] || { log "$part:$bsrc: not an ELF image, trying next"; continue; }
+		[ "$esz" -ge 4096 ] && [ "$esz" -le $((1024 * 1024)) ] || { log "$part:$bsrc: $esz bytes is not a board data file, trying next"; continue; }
+		nlen=${#bname}
+		npad=$(( (nlen + 3) / 4 * 4 ))
+		dpad=$(( (esz + 3) / 4 * 4 ))
+		tmp="$bdest.fp6-extract.$$"
+		# container = base + BOARD IE { NAME IE, DATA IE }, each IE padded to 4
+		{
+			cat "$braw"
+			le32 0; le32 $((8 + npad + 8 + dpad))
+			le32 0; le32 "$nlen"; printf '%s' "$bname"; pad4 "$nlen"
+			le32 1; le32 "$esz"; cat "$elf"; pad4 "$esz"
+		} > "$tmp" 2>/dev/null || { rm -f "$tmp"; fail "ath11k-bdf: writing $tmp failed"; }
+		want=$(( $(fsize "$braw") + 8 + 8 + npad + 8 + dpad ))
+		tsz=$(fsize "$tmp")
+		[ "$tsz" -eq "$want" ] || { rm -f "$tmp" "$braw"; fail "ath11k-bdf: $tmp is $tsz bytes, expected $want"; }
+		got=$(sha256sum "$tmp" | awk '{print $1}')
+		if [ -e "$bdest" ] && [ "$(sha256sum "$bdest" | awk '{print $1}')" = "$got" ]; then
+			rm -f "$tmp" "$braw"
+			echo "$bid" > "$bdest.fp6-base" || fail "ath11k-bdf: cannot write $bdest.fp6-base"
+			log "ath11k-bdf: $bdest is already $bbase + $bname from $part:$bsrc (sha256 $got) - unchanged"
+			return 2
+		fi
+		chmod 644 "$tmp" && mv "$tmp" "$bdest" || { rm -f "$tmp" "$braw"; fail "installing $bdest failed"; }
+		echo "$bid" > "$bdest.fp6-base" || fail "ath11k-bdf: cannot write $bdest.fp6-base"
+		rm -f "$braw"
+		log "built $bdest = $bbase + $bname from $part:$bsrc ($esz bytes, sha256 $got)"
+		return 0
+	done
+	rm -f "$braw"
+	kept=
+	[ -e "$bdest" ] && kept=" (the existing file is left in place)"
+	fail "no listed partition ($parts) yields a well-formed $bsrc - $bdest NOT installed$kept"
+}
 extract() { # <partition,...> <path-in-partition> <dest> <sha256>
 	parts=$1 src=$2 dest=$3 want=$4
 	for part in $(order_parts "$parts"); do
@@ -312,7 +402,8 @@ fi
 
 [ -d "$MANIFEST_DIR" ] || exit 0
 
-# fast path for every boot after the first: all dests already present
+# fast path for every boot after the first: every file/mbn dest present and
+# every ath11k-bdf dest current against its base (bdf_current)
 missing=
 for f in "$MANIFEST_DIR"/*.manifest; do
 	[ -e "$f" ] || continue
@@ -320,6 +411,7 @@ for f in "$MANIFEST_DIR"/*.manifest; do
 		case "$kind" in
 		file) [ -e "$c" ] || missing=1 ;;
 		mbn)  [ -e "$d" ] && [ -z "$REFRESH" ] || missing=1 ;;
+		ath11k-bdf) [ -z "$REFRESH" ] && bdf_current "$d" "$e" || missing=1 ;;
 		esac
 	done < "$f"
 done
@@ -344,6 +436,12 @@ for f in "$MANIFEST_DIR"/*.manifest; do
 			[ -e "$d" ] && [ -z "$REFRESH" ] && continue
 			extract_mbn "$a" "$b" "$c" "$d" "$e" </dev/null
 			extracted=1
+			;;
+		ath11k-bdf)
+			[ -n "$e" ] || fail "$f: malformed ath11k-bdf line"
+			[ -z "$REFRESH" ] && bdf_current "$d" "$e" && continue
+			extract_ath11k_bdf "$a" "$b" "$c" "$d" "$e" </dev/null
+			[ $? -eq 0 ] && extracted=1
 			;;
 		rebind)
 			[ -n "$b" ] || fail "$f: malformed rebind line"

@@ -1,0 +1,17 @@
+# WCN6750 WLAN board data (calibration, Qualcomm/Fairphone) - taken from the
+# stock modem partition on-device instead of being shipped (fp6 repo
+# journal/base/ 2026-10-14, journal/blobs/). The device tree asks ath11k for
+# the Fairphone_Gen_6 entry; upstream linux-firmware's board-2.bin has none,
+# the driver silently falls back to generic data, and on that the FP6 Plus
+# does not associate at all (user report 2026-10-14) while the FP6's scans
+# no longer find the 5 GHz networks around it, so it associates on 2.4 GHz
+# only (dev phone A/B 2026-11-01). The container built here is upstream's
+# file with every entry kept plus the device's own bdwlan.elf under the
+# requested name; it lives in /lib/firmware/updates, which the loader
+# searches first. Active slot first, the other slot as fallback; no hash pin
+# - the ELF belongs to the stock modem image and can change with it. No
+# rebind line: the service runs before the driver loads, so a fresh install
+# has the container at the first probe and an installed phone gets it at
+# its next boot - a re-probe from a package hook would restart wifi in the
+# middle of an upgrade.
+ath11k-bdf modem_a,modem_b image/qca6750/bdwlan.elf bus=ahb,qmi-chip-id=1,qmi-board-id=255,variant=Fairphone_Gen_6 /usr/lib/firmware/ath11k/WCN6750/hw1.0/board-2.bin.zst /usr/lib/firmware/updates/ath11k/WCN6750/hw1.0/board-2.bin
