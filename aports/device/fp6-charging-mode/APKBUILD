@@ -31,7 +31,7 @@ pkgrel=0
 pkgdesc="Fairphone 6 offline charging mode (charger-boot detection + minimal charging target)"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
 arch="noarch"
-license="MIT"
+license="GPL-3.0-only"
 options="!check"
 source="
 	charging-mode-generator

@@ -25,7 +25,7 @@ pkgrel=3
 pkgdesc="On-device extraction of vendor blobs from the stock Android partitions"
 url="https://forgejo.catcrafts.net/Catcrafts/fp6-img"
 arch="noarch"
-license="MIT"
+license="GPL-3.0-only"
 # fallback mapper for when the initramfs didn't map the dynamic partitions
 depends="make-dynpart-mappings"
 install="$pkgname.post-upgrade"
