@@ -38,3 +38,15 @@ NV back and reports the result. The bootloader never writes `boot`.
 
 Default login: `user` / `147147` (same as official Nura images). 
 **Never re-lock the bootloader** with a custom image installed.
+
+## License
+
+GPL-3.0-only - see [LICENSE](LICENSE). That covers our own code; patches and packaging carried from other projects keep the license named in their files.
+
+## Funding
+
+https://catcrafts.net/shop/donation - see [FUNDING](FUNDING.yml)
+
+## Copyright
+
+Copyright (C) 2026 Catcrafts® [catcrafts.net](https://catcrafts.net/)
