@@ -41,7 +41,9 @@ Default login: `user` / `147147` (same as official Nura images).
 
 ## License
 
-GPL-3.0-only - see [LICENSE](LICENSE). That covers our own code; patches and packaging carried from other projects keep the license named in their files.
+GPL-3.0-only - see [LICENSE](LICENSE).
+
+Patches and packaging carried from other projects keep the license named in their files.
 
 ## Funding
 
