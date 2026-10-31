@@ -2,7 +2,12 @@
 # yet: the AudioReach topology (built from Catcrafts/audioreach-topology
 # branch fp6), the UCM profile, and pipewire config. Files are
 # byte-identical to the ones deployed and tested on the development FP6.
-# The tplg/UCM target filenames contain spaces, hence the safe source names.
+# The tplg/UCM target filenames carry the sound card model string from the
+# board DTS: the q6apm topology loader requests qcom/milos/<model>-tplg.bin
+# and alsa-ucm resolves conf.d/milos/<model>.conf. Kernel 7.3 names the card
+# "MILOS-Fairphone-Gen6", 7.2 named it "Fairphone (Gen. 6)"; both files are
+# installed under the new name with the old name as a symlink, so the package
+# serves either kernel - the one still running after an upgrade included.
 #
 # The proprietary AW88261 amp config blob (aw88261_acf.bin) is NOT shipped
 # since pkgver 4: fp6-vendor-blobs extracts it from the stock vendor
@@ -10,8 +15,8 @@
 # distributed. Provenance/design: fp6 repo journal/blobs/.
 maintainer="Jorijn van der Graaf <jorijnvdgraaf@catcrafts.net>"
 pkgname=soc-fairphone-fp6-audio
-pkgver=4
-pkgrel=1
+pkgver=5
+pkgrel=0
 pkgdesc="Fairphone 6 audio topology and UCM profile"
 url="https://forgejo.catcrafts.net/Catcrafts/audioreach-topology"
 arch="noarch"
@@ -29,10 +34,14 @@ source="
 
 package() {
 	install -Dm644 "$srcdir"/fp6-tplg.bin \
+		"$pkgdir"/usr/lib/firmware/qcom/milos/MILOS-Fairphone-Gen6-tplg.bin
+	ln -s MILOS-Fairphone-Gen6-tplg.bin \
 		"$pkgdir/usr/lib/firmware/qcom/milos/Fairphone (Gen. 6)-tplg.bin"
 	install -Dm644 "$srcdir"/aw88261-acf.manifest \
 		"$pkgdir"/usr/share/fp6-vendor-blobs/manifest.d/10-aw88261-acf.manifest
 	install -Dm644 "$srcdir"/ucm-milos-fp6.conf \
+		"$pkgdir"/usr/share/alsa/ucm2/conf.d/milos/MILOS-Fairphone-Gen6.conf
+	ln -s MILOS-Fairphone-Gen6.conf \
 		"$pkgdir/usr/share/alsa/ucm2/conf.d/milos/Fairphone (Gen. 6).conf"
 	install -Dm644 "$srcdir"/HiFi.conf \
 		"$pkgdir"/usr/share/alsa/ucm2/Fairphone/fp6/HiFi.conf
