@@ -73,21 +73,33 @@ jobs:
           fi
           apk add -q curl
           found=0
-          for f in /home/build/.local/var/pmbootstrap/packages/*/aarch64/*.apk; do
-            [ -e "$f" ] || continue
-            case "$(basename "$f")" in
-              imsd-*|fingerprintd-*) echo "registry-sourced, not republished: $(basename "$f")"; continue ;;
-              libqmi-*|qmi-utils-*) echo "retired fork, not republished: $(basename "$f")"; continue ;;
+          publish() {
+            case "$(basename "$1")" in
+              imsd-*|fingerprintd-*) echo "registry-sourced, not republished: $(basename "$1")"; return 0 ;;
+              libqmi-*|qmi-utils-*) echo "retired fork, not republished: $(basename "$1")"; return 0 ;;
             esac
             found=1
             code=$(curl -s -o /dev/null -w '%{http_code}' \
-              --user "catbot:$PACKAGE_TOKEN" --upload-file "$f" \
+              --user "catbot:$PACKAGE_TOKEN" --upload-file "$1" \
               "https://forgejo.catcrafts.net/api/packages/Catcrafts/alpine/edge/fp6")
             case "$code" in
-              201) echo "published: $(basename "$f")" ;;
-              409) echo "already published: $(basename "$f")" ;;
-              *)   echo "FAILED ($code): $(basename "$f")"; exit 1 ;;
+              201) echo "published: $(basename "$1")" ;;
+              409) echo "already published: $(basename "$1")" ;;
+              *)   echo "FAILED ($code): $(basename "$1")"; exit 1 ;;
             esac
+          }
+          # The kernel goes last: a publish that fails part-way (the first
+          # failed upload ends this step) must never leave the registry serving
+          # a kernel without the userspace its card name needs - the 7.3 kernel
+          # has its topology and UCM only in soc-fairphone-fp6-audio >= 5.
+          for f in /home/build/.local/var/pmbootstrap/packages/*/aarch64/*.apk; do
+            [ -e "$f" ] || continue
+            case "$(basename "$f")" in linux-postmarketos-qcom-milos-*) continue ;; esac
+            publish "$f"
+          done
+          for f in /home/build/.local/var/pmbootstrap/packages/*/aarch64/linux-postmarketos-qcom-milos-*.apk; do
+            [ -e "$f" ] || continue
+            publish "$f"
           done
           [ "$found" = 1 ] || { echo "no packages found to publish"; exit 1; }
 
