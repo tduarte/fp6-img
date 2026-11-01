@@ -108,7 +108,11 @@ jobs:
           git config --global --add safe.directory "$PWD"
           git config user.email "ci@catcrafts.net"
           git config user.name "fp6-img CI"
-          git tag -f latest
+          # Annotated, so the release keeps the top of the releases page:
+          # Forgejo stamps a release with its tag's time at every tag push -
+          # a lightweight tag's is the commit's, older than the dated release
+          # tagged at push time; an annotated tag's is now.
+          git tag -a -f latest -m "Latest FP6 Nura image, built $(date -u +%Y-%m-%d) from $(git rev-parse --short HEAD)"
           git push origin latest --force
 
       - name: Publish rolling 'latest' release
