@@ -14,7 +14,7 @@ name: image
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, claude/gh-actions-image-d9be47]  # TEMP: bring-up branch
 
 concurrency:
   group: image-${{ github.ref }}
