@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: CC0-1.0
+#
+# libcamera softISP tuning for the Fairphone 6 front camera (Samsung S5KKD1).
+#
+# First cut, not calibrated: black level is the sensor's 10-bit pedestal of
+# 64 (raw frames bottom out at 61..64), i.e. 4096 on the 16-bit scale.
+# AWB is plain grey world and there is no CCM yet - the stock FP6 tuning data
+# for this sensor (vendor partition) has not been decoded. No Af: the
+# AW86016 actuator has no driver.
+%YAML 1.1
+---
+version: 1
+algorithms:
+  - BlackLevel:
+      blackLevel: 4096
+  - Awb:
+  - Adjust:
+  - Agc:
+...

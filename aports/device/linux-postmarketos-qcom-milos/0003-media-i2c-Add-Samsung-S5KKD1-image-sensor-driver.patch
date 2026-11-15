@@ -1,4 +1,4 @@
-From 77e98702009f225c71c4f14f881c937a9a6295b8 Mon Sep 17 00:00:00 2001
+From b434b04a578046108e680dc6c647a9c99154eb2b Mon Sep 17 00:00:00 2001
 From: Thiago Duarte <me@tduarte.co>
 Date: Sat, 14 Nov 2026 19:12:31 -0800
 Subject: [PATCH 3/4] media: i2c: Add Samsung S5KKD1 image sensor driver
@@ -24,8 +24,8 @@ Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
 ---
  drivers/media/i2c/Kconfig  |   10 +
  drivers/media/i2c/Makefile |    1 +
- drivers/media/i2c/s5kkd1.c | 1877 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 1888 insertions(+)
+ drivers/media/i2c/s5kkd1.c | 1889 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 1900 insertions(+)
  create mode 100644 drivers/media/i2c/s5kkd1.c
 
 diff --git a/drivers/media/i2c/Kconfig b/drivers/media/i2c/Kconfig
@@ -63,10 +63,10 @@ index 505ae8c13740..b5d19d4149b7 100644
  obj-$(CONFIG_VIDEO_SAA7110) += saa7110.o
 diff --git a/drivers/media/i2c/s5kkd1.c b/drivers/media/i2c/s5kkd1.c
 new file mode 100644
-index 000000000000..49cfa01fed0a
+index 000000000000..2a0898426bfd
 --- /dev/null
 +++ b/drivers/media/i2c/s5kkd1.c
-@@ -0,0 +1,1877 @@
+@@ -0,0 +1,1889 @@
 +// SPDX-License-Identifier: GPL-2.0
 +// Samsung S5KKD1 (S5KKD1SP) 32 MP image sensor driver
 +//
@@ -103,6 +103,10 @@ index 000000000000..49cfa01fed0a
 +#define S5KKD1_REG_ORIENTATION		CCI_REG8(0x0101)
 +#define S5KKD1_VFLIP			BIT(1)
 +#define S5KKD1_HFLIP			BIT(0)
++
++/* Pixel array: the full-resolution readout, 6208x4672 */
++#define S5KKD1_PIXEL_ARRAY_WIDTH	6208
++#define S5KKD1_PIXEL_ARRAY_HEIGHT	4672
 +
 +#define S5KKD1_REG_EXPOSURE		CCI_REG16(0x0202)
 +#define S5KKD1_EXPOSURE_MIN		8
@@ -152,6 +156,7 @@ index 000000000000..49cfa01fed0a
 +	u32 vts;			/* Default vertical timing size */
 +	u32 exposure;			/* Default exposure value */
 +	u32 exposure_margin;		/* Exposure margin */
++	struct v4l2_rect crop;		/* Analogue crop in the pixel array */
 +
 +	const struct s5kkd1_reg_list reg_list;	/* Sensor register setting */
 +};
@@ -1180,6 +1185,7 @@ index 000000000000..49cfa01fed0a
 +		.vts = 5078,
 +		.exposure = 5054,
 +		.exposure_margin = 24,
++		.crop = { 0, 0, 6208, 4672 },
 +		.reg_list = {
 +			.regs = s5kkd1_3104x2336_30fps_mode,
 +			.num_regs = ARRAY_SIZE(s5kkd1_3104x2336_30fps_mode),
@@ -1192,6 +1198,7 @@ index 000000000000..49cfa01fed0a
 +		.vts = 5082,
 +		.exposure = 5058,
 +		.exposure_margin = 24,
++		.crop = { 0, 0, 6208, 4672 },
 +		.reg_list = {
 +			.regs = s5kkd1_6208x4672_15fps_mode,
 +			.num_regs = ARRAY_SIZE(s5kkd1_6208x4672_15fps_mode),
@@ -1204,6 +1211,7 @@ index 000000000000..49cfa01fed0a
 +		.vts = 1266,
 +		.exposure = 1242,
 +		.exposure_margin = 24,
++		.crop = { 1184, 1256, 3840, 2160 },
 +		.reg_list = {
 +			.regs = s5kkd1_1920x1080_120fps_mode,
 +			.num_regs = ARRAY_SIZE(s5kkd1_1920x1080_120fps_mode),
@@ -1534,11 +1542,15 @@ index 000000000000..49cfa01fed0a
 +
 +	switch (sel->target) {
 +	case V4L2_SEL_TGT_CROP:
++		sel->r = s5kkd1->mode->crop;
++		return 0;
++	case V4L2_SEL_TGT_NATIVE_SIZE:
 +	case V4L2_SEL_TGT_CROP_BOUNDS:
++	case V4L2_SEL_TGT_CROP_DEFAULT:
 +		sel->r.left = 0;
 +		sel->r.top = 0;
-+		sel->r.width = s5kkd1->mode->width;
-+		sel->r.height = s5kkd1->mode->height;
++		sel->r.width = S5KKD1_PIXEL_ARRAY_WIDTH;
++		sel->r.height = S5KKD1_PIXEL_ARRAY_HEIGHT;
 +		return 0;
 +	default:
 +		return -EINVAL;

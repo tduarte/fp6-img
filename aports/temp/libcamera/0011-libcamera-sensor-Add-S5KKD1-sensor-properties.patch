@@ -1,0 +1,42 @@
+From 4c721dbccf4721b767f7c1f36589d85c5c819c50 Mon Sep 17 00:00:00 2001
+From: Thiago Duarte <me@tduarte.co>
+Date: Sun, 15 Nov 2026 04:22:55 +0000
+Subject: [PATCH 11/11] libcamera: sensor: Add S5KKD1 sensor properties
+
+Unit cell size 0.7 um (Samsung ISOCELL KD1, 32 MP class) and the test
+pattern menu of the s5kkd1 kernel driver, which follows the usual
+Samsung/SMIA order: off, solid colour, colour bars, fade-to-grey colour
+bars, PN9.
+
+The sensor delays are left to the defaults until they are measured.
+
+Assisted-by: Claude:claude-opus-5-5
+---
+ src/libcamera/sensor/camera_sensor_properties.cpp | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/src/libcamera/sensor/camera_sensor_properties.cpp b/src/libcamera/sensor/camera_sensor_properties.cpp
+index 8360cfe..73c8159 100644
+--- a/src/libcamera/sensor/camera_sensor_properties.cpp
++++ b/src/libcamera/sensor/camera_sensor_properties.cpp
+@@ -590,6 +590,17 @@ const CameraSensorProperties *CameraSensorProperties::get(const std::string &sen
+ 			},
+ 			.sensorDelays = { },
+ 		} },
++		{ "s5kkd1", {
++			.unitCellSize = { 700, 700 },
++			.testPatternModes = {
++				{ controls::draft::TestPatternModeOff, 0 },
++				{ controls::draft::TestPatternModeSolidColor, 1 },
++				{ controls::draft::TestPatternModeColorBars, 2 },
++				{ controls::draft::TestPatternModeColorBarsFadeToGray, 3 },
++				{ controls::draft::TestPatternModePn9, 4 },
++			},
++			.sensorDelays = { },
++		} },
+ 		{ "vd55g1", {
+ 			.unitCellSize = { 2160, 2160 },
+ 			.testPatternModes = {
+-- 
+2.56.1
+

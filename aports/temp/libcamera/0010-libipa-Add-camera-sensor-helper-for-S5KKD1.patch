@@ -1,0 +1,43 @@
+From 0fcdbf14f64cad6d9da1c9de93cec0de804e55e0 Mon Sep 17 00:00:00 2001
+From: Thiago Duarte <me@tduarte.co>
+Date: Sun, 15 Nov 2026 04:22:55 +0000
+Subject: [PATCH 10/11] libipa: Add camera sensor helper for S5KKD1
+
+The Samsung S5KKD1 (front sensor of the Fairphone 6 / milos) needs a
+CameraSensorHelper so the software ISP AGC can map the analogue gain
+register code to a real gain. Without it libcamera logs "IPASoftIsp:
+Failed to create camera sensor helper for s5kkd1" and the AGC treats
+the raw code as a linear gain, which leaves the image black.
+
+The sensor uses the usual Samsung linear model on register 0x0204:
+gain = code / 32, so the driver's range 32..512 is 1x..16x.
+
+Assisted-by: Claude:claude-opus-5-5
+---
+ src/ipa/libipa/camera_sensor_helper.cpp | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/ipa/libipa/camera_sensor_helper.cpp b/src/ipa/libipa/camera_sensor_helper.cpp
+index 24fcce4..0d79179 100644
+--- a/src/ipa/libipa/camera_sensor_helper.cpp
++++ b/src/ipa/libipa/camera_sensor_helper.cpp
+@@ -907,6 +907,16 @@ public:
+ };
+ REGISTER_CAMERA_SENSOR_HELPER("ov13b10", CameraSensorHelperOv13b10)
+ 
++class CameraSensorHelperS5kkd1 : public CameraSensorHelper
++{
++public:
++	CameraSensorHelperS5kkd1()
++	{
++		gain_ = AnalogueGainLinear{ 1, 0, 0, 32 };
++	}
++};
++REGISTER_CAMERA_SENSOR_HELPER("s5kkd1", CameraSensorHelperS5kkd1)
++
+ class CameraSensorHelperVd55g1 : public CameraSensorHelper
+ {
+ public:
+-- 
+2.56.1
+

@@ -96,7 +96,7 @@ patches)
 	git config --global --add safe.directory /work/milos-linux
 	t=/work/fp6-img/$KAPORT
 	rm -f $t/000*.patch
-	git format-patch -q --no-signature -o $t "$KERNEL_COMMIT"..HEAD
+	git -c core.abbrev=12 format-patch -q --signature=2.56.0 -o $t "$KERNEL_COMMIT"..HEAD
 	ls $t/*.patch
 	echo "update source= in $t/APKBUILD if the patch names changed"'
 	;;

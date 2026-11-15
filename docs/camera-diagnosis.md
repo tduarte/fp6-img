@@ -135,3 +135,18 @@ Approach changed from the maintainer's CCS route to a dedicated driver.
   `fp6-front-camera` in `milos-linux/`).
 - Test loop: `boot/cycle.sh` (reboot → `fastboot boot` → swap modules),
   `boot/front-capture.sh` on the phone, `captures/raw2jpg.py` to view.
+
+## Front camera in libcamera (2026-11-14, night)
+
+- Kernel: `s5kkd1_get_selection()` now answers NATIVE_SIZE, CROP_BOUNDS and
+  CROP_DEFAULT with the 6208x4672 pixel array and CROP with each mode's
+  analogue crop (read from the mode tables' 0x0344..0x034A: the 1080p mode is
+  (1184,1256)/3840x2160). libcamera stops defaulting the array geometry.
+- libcamera r103: `0010` sensor helper (gain = code/32, 1x..16x), `0011`
+  properties (0.7 um cells, test patterns), `s5kkd1.yaml` (black level 4096,
+  grey-world AWB, no CCM yet). With them, AE converges: a 40-frame `cam -c 2`
+  capture indoors averages ~92/255; before, frames were black.
+- PipeWire lists it (`s5kkd1 [libcamera]`) and GNOME Snapshot uses it as the
+  front camera; rotation 270 comes from the DT.
+- Left: CCM from the stock tuning data, sensor delays, AW86016 AF driver,
+  and the image build carrying the kernel patches.
