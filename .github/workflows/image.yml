@@ -1,0 +1,88 @@
+name: image
+
+# Builds the flashable Phosh image for the Fairphone 6 (fp6-img-phosh.tar.xz)
+# with build.sh on a GitHub-hosted arm64 runner and uploads dist/* as a
+# workflow artifact. GitHub counterpart of .forgejo/workflows/build.yml,
+# without its Forgejo-only steps (apk registry publish, rolling 'latest'
+# release).
+#
+# build.sh expects root in an Alpine environment with loop devices; it runs
+# here in a privileged alpine:edge container with the host's /dev
+# bind-mounted (partition nodes only appear on the host devtmpfs). The
+# runner is aarch64, so the pmbootstrap chroots are native: no qemu-user.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phosh:
+    runs-on: ubuntu-24.04-arm
+    # hosted runners stop a job at 6 h
+    timeout-minutes: 355
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ubuntu-24.04-arm has ~34 GB free on / (72 GB disk). The build peaks at
+      # ~10 GB (pmbootstrap work dir 7.1 GB, fp6img-work 2.5 GB, 660 MiB
+      # archive), so this is headroom, not a requirement; it takes ~1 min and
+      # lifts free space to ~56 GB.
+      - name: Free disk space
+        run: |
+          df -h / /mnt 2>/dev/null || df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache /usr/local/share/boost /usr/local/.ghcup \
+            /usr/share/swift /usr/local/share/powershell /usr/lib/jvm \
+            /opt/microsoft /opt/google /usr/local/julia* /usr/share/miniconda \
+            /usr/local/share/chromium /usr/local/lib/node_modules || true
+          sudo docker image prune -a -f >/dev/null || true
+          sudo swapoff -a || true
+          sudo rm -f /swapfile /mnt/swapfile || true
+          df -h / /mnt 2>/dev/null || df -h /
+
+      # The build user's home (pmbootstrap work dir + fp6img-work) lives on
+      # the host, on whichever filesystem has the most room, instead of the
+      # container's overlayfs.
+      - name: Prepare build home
+        run: |
+          best=/
+          if [ -d /mnt ] && [ "$(df --output=avail /mnt | tail -1)" -gt "$(df --output=avail / | tail -1)" ]; then
+            best=/mnt
+          fi
+          sudo mkdir -p "$best/fp6-home"
+          echo "BUILD_HOME=$best/fp6-home" >> "$GITHUB_ENV"
+          echo "build home on $best"
+          sudo modprobe loop || true
+          ls -l /dev/loop-control
+
+      - name: Build image (Phosh)
+        run: |
+          docker run --rm --privileged \
+            -v /dev:/dev \
+            -v "$PWD:/src" \
+            -v "$BUILD_HOME:/home" \
+            -w /src \
+            -e FP6IMG_UI=phosh \
+            alpine:edge sh -euc 'apk add -q bash && ./build.sh'
+
+      - name: Disk usage after build
+        if: always()
+        run: |
+          df -h / /mnt 2>/dev/null || df -h /
+          sudo du -sh "$BUILD_HOME"/build/.local/var/pmbootstrap "$BUILD_HOME"/build/fp6img-work 2>/dev/null || true
+          ls -la dist/ || true
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: fp6-img-phosh-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          # already xz-compressed
+          compression-level: 0
