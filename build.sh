@@ -18,6 +18,10 @@ set -eu
 
 KERNEL_REPO=https://forgejo.catcrafts.net/Catcrafts/milos-linux.git
 KERNEL_BRANCH=combined-stable
+# The kernel patch queue in the kernel aport (000*.patch) is written against
+# this commit of $KERNEL_BRANCH. Set it empty to build the branch head instead;
+# the patches then have to still apply.
+KERNEL_COMMIT=${KERNEL_COMMIT-27825d9fdbd75e7281e74b44149c8c19da129793}
 # imsd and fingerprintd are not built here: each repo's package CI publishes
 # its apk to the registry, and the image installs the NEWEST published
 # version (section 3b), so a fresh install carries the same binary every
@@ -177,7 +181,15 @@ cp -r aports/temp/libcamera "$WORK/pmaports/temp/"
 # Source archives are disabled on the Forgejo instance, so generate the
 # tarball ourselves; abuild treats it as a local source file.
 
-clone_retry "$WORK/milos-src" -q --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_REPO"
+if [ -n "$KERNEL_COMMIT" ]; then
+	# shallow-fetch exactly the pinned commit
+	rm -rf "$WORK/milos-src"
+	git init -q "$WORK/milos-src"
+	git -C "$WORK/milos-src" fetch -q --depth=1 "$KERNEL_REPO" "$KERNEL_COMMIT"
+	git -C "$WORK/milos-src" checkout -q FETCH_HEAD
+else
+	clone_retry "$WORK/milos-src" -q --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_REPO"
+fi
 COMMIT=$(git -C "$WORK/milos-src" rev-parse HEAD)
 KAPORT="$WORK/pmaports/device/testing/linux-postmarketos-qcom-milos"
 git -C "$WORK/milos-src" archive --prefix=milos-linux/ \

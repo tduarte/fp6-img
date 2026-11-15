@@ -11,7 +11,7 @@ _flavor="postmarketos-qcom-milos"
 pkgname=linux-$_flavor
 pkgver=7.3.0
 # always sorts above the upstream aport (r0..r99)
-pkgrel=103
+pkgrel=104
 pkgdesc="Milos mainline kernel + Catcrafts FP6 bring-up carries (combined-stable)"
 arch="aarch64"
 _carch="arm64"
@@ -56,6 +56,10 @@ _commit="REPLACED_BY_CI"
 source="
 	milos-linux-$_commit.tar.gz
 	$_config
+	0001-media-qcom-camss-csid-340-Widen-the-PHY-select-field.patch
+	0002-media-qcom-camss-vfe-Align-RDI-line-stride-to-16-byt.patch
+	0003-media-i2c-Add-Samsung-S5KKD1-image-sensor-driver.patch
+	0004-arm64-dts-qcom-milos-fairphone-fp6-Add-the-S5KKD1-fr.patch
 "
 builddir="$srcdir/milos-linux"
 

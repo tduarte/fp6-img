@@ -1,0 +1,40 @@
+From 95bc82b3fb1f8aaba7d637cdb4c6fb3b9b9cd857 Mon Sep 17 00:00:00 2001
+From: Thiago Duarte <me@tduarte.co>
+Date: Sat, 14 Nov 2026 19:12:30 -0800
+Subject: [PATCH 1/4] media: qcom: camss: csid-340: Widen the PHY select field
+ to three bits
+
+CSID_CSI2_RX_CFG0 selects the input PHY as csiphy index + 1 in a field
+defined as GENMASK(21, 20). With four CSIPHYs, as on Milos, the fourth one
+needs the value 4, which does not fit: the field is written as 0 and the
+CSID listens to no PHY. A sensor on csiphy3 then streams (its frame counter
+runs) while the capture never completes a frame.
+
+The downstream TFE CSID drivers use a three bit mask for this field
+(csi2_rx_phy_num_mask = 0x7 in cam_tfe_csid530.h and cam_tfe_csid640.h),
+and bit 22 is not otherwise used here. Use GENMASK(22, 20).
+
+Tested on a Fairphone (Gen. 6): the front sensor on csiphy3 delivers
+frames with this change and none without it; csiphy1 keeps working.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+---
+ drivers/media/platform/qcom/camss/camss-csid-340.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/qcom/camss/camss-csid-340.c b/drivers/media/platform/qcom/camss/camss-csid-340.c
+index 9a5a6710c0c6..689a76935b1f 100644
+--- a/drivers/media/platform/qcom/camss/camss-csid-340.c
++++ b/drivers/media/platform/qcom/camss/camss-csid-340.c
+@@ -32,7 +32,7 @@
+ #define CSID_CSI2_RX_CFG0					(0x100)
+ #define		CSI2_RX_CFG0_NUM_ACTIVE_LANES_MASK	GENMASK(1, 0)
+ #define		CSI2_RX_CFG0_DLX_INPUT_SEL_MASK		GENMASK(17, 4)
+-#define		CSI2_RX_CFG0_PHY_NUM_SEL_MASK		GENMASK(21, 20)
++#define		CSI2_RX_CFG0_PHY_NUM_SEL_MASK		GENMASK(22, 20)
+ #define		CSI2_RX_CFG0_PHY_NUM_SEL_BASE_IDX	1
+ #define		CSI2_RX_CFG0_PHY_TYPE_SEL		BIT(24)
+ 
+-- 
+2.56.0
+

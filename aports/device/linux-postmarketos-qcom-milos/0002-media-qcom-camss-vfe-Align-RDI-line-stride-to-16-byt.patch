@@ -1,0 +1,44 @@
+From e7c6d7c64d051a888bdc220f783d10657bec2f64 Mon Sep 17 00:00:00 2001
+From: Thiago Duarte <me@tduarte.co>
+Date: Sat, 14 Nov 2026 19:12:30 -0800
+Subject: [PATCH 2/4] media: qcom: camss: vfe: Align RDI line stride to 16
+ bytes on Milos
+
+The Milos TFE write masters store RDI lines on a 16 byte stride, but
+vfe_bpl_align_rdi() falls through to the 8 byte default for CAMSS_MILOS.
+For widths whose packed line length is not a multiple of 16 the reported
+bytesperline is then too small: a 3104 pixel wide RAW10 frame is
+advertised with a stride of 3880 while the hardware writes 3888 bytes per
+line. The image comes out sheared, and the hardware writes past the end of
+the buffer:
+
+  arm-smmu 15000000.iommu: Unhandled context fault: fsr=0x402,
+  iova=0xfd8a5000, fsynr=0x590013, cbfrsynra=0x8a0, cb=10
+
+The modes used so far (4096, 4160 and 4208 pixels wide) happen to have
+16 byte aligned line lengths, which is why this went unnoticed.
+
+Tested on a Fairphone (Gen. 6) with a 3104x2336 RAW10 sensor mode: stride
+is reported as 3888, a colour bar test pattern is captured without shear
+and the IOMMU faults are gone.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+---
+ drivers/media/platform/qcom/camss/camss-vfe.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/media/platform/qcom/camss/camss-vfe.c b/drivers/media/platform/qcom/camss/camss-vfe.c
+index fb7ee2fcb2f1..eb7786a2a0bb 100644
+--- a/drivers/media/platform/qcom/camss/camss-vfe.c
++++ b/drivers/media/platform/qcom/camss/camss-vfe.c
+@@ -2014,6 +2014,7 @@ static int vfe_bpl_align_rdi(struct vfe_device *vfe)
+ 	case CAMSS_8550:
+ 	case CAMSS_8650:
+ 	case CAMSS_8775P:
++	case CAMSS_MILOS:
+ 	case CAMSS_X1E80100:
+ 		ret = 16;
+ 		break;
+-- 
+2.56.0
+

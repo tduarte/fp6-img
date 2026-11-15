@@ -1,0 +1,120 @@
+From db43aa269e9b504a0c7bcba99badcb2ead164104 Mon Sep 17 00:00:00 2001
+From: Thiago Duarte <me@tduarte.co>
+Date: Sat, 14 Nov 2026 19:12:31 -0800
+Subject: [PATCH 4/4] arm64: dts: qcom: milos-fairphone-fp6: Add the S5KKD1
+ front camera
+
+Describe the front camera: a Samsung S5KKD1 at 0x3d on cci1_i2c1, clocked
+by MCLK3 on gpio86, reset on gpio43, supplied from the pm8008 (analog
+vreg_l3p, digital core vreg_l2p, I/O vreg_l6p), and connected to camss
+csiphy3 over four D-PHY data lanes.
+
+The pin states, supplies and the csiphy3 endpoint come from Jorijn van der
+Graaf's "add S5KKD1SP front camera as a CCS device" patch; the node now
+binds the dedicated s5kkd1 driver instead of the generic CCS one.
+
+The autofocus actuator (AW86016 at 0x0c on the same bus) is not described.
+The rotation value is not verified.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+---
+ .../boot/dts/qcom/milos-fairphone-fp6.dts     | 43 ++++++++++++++++++-
+ arch/arm64/boot/dts/qcom/milos.dtsi           | 21 +++++++++
+ 2 files changed, 63 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/milos-fairphone-fp6.dts b/arch/arm64/boot/dts/qcom/milos-fairphone-fp6.dts
+index 8f42214d10c0..e6187f4d3738 100644
+--- a/arch/arm64/boot/dts/qcom/milos-fairphone-fp6.dts
++++ b/arch/arm64/boot/dts/qcom/milos-fairphone-fp6.dts
+@@ -926,6 +926,13 @@ csiphy1_ep: endpoint {
+ 				data-lanes = <0 1 2 3>;
+ 			};
+ 		};
++
++		port@3 {
++			csiphy3_ep: endpoint {
++				remote-endpoint = <&s5kkd1sp_ep>;
++				data-lanes = <0 1 2 3>;
++			};
++		};
+ 	};
+ };
+ 
+@@ -939,7 +946,41 @@ &cci1 {
+ 
+ &cci1_i2c1 {
+ 	/* Awinic AW86016 VCM @ 0x0c */
+-	/* Front cam: Samsung S5KKD1 @ 0x3d */
++
++	/*
++	 * Front cam: Samsung S5KKD1SP @ 0x3d.
++	 *
++	 * Rails (pm8008): analog 2.8 V = vreg_l3p, digital core 1.05 V =
++	 * vreg_l2p, I/O 1.8 V = vreg_l6p (shared with the EEPROMs).
++	 */
++	camera@3d {
++		compatible = "samsung,s5kkd1";
++		reg = <0x3d>;
++
++		clocks = <&camcc CAM_CC_MCLK3_CLK>;
++		assigned-clocks = <&camcc CAM_CC_MCLK3_CLK>;
++		assigned-clock-rates = <24000000>;
++
++		vdda-supply = <&vreg_l3p>;
++		vddd-supply = <&vreg_l2p>;
++		vddio-supply = <&vreg_l6p>;
++
++		reset-gpios = <&tlmm 43 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cam_mclk3_default &s5kkd1sp_reset_default>;
++
++		/* Front-facing camera */
++		orientation = <0>;
++		rotation = <270>;
++
++		port {
++			s5kkd1sp_ep: endpoint {
++				remote-endpoint = <&csiphy3_ep>;
++				data-lanes = <1 2 3 4>;
++				link-frequencies = /bits/ 64 <906000000>;
++			};
++		};
++	};
+ 
+ 	eeprom@51 {
+ 		compatible = "puya,p24c128f", "atmel,24c128";
+diff --git a/arch/arm64/boot/dts/qcom/milos.dtsi b/arch/arm64/boot/dts/qcom/milos.dtsi
+index d4a2afd25a10..22c7f9c8b72e 100644
+--- a/arch/arm64/boot/dts/qcom/milos.dtsi
++++ b/arch/arm64/boot/dts/qcom/milos.dtsi
+@@ -3408,6 +3408,27 @@ ov13b10_reset_default: ov13b10-reset-default-state {
+ 				bias-disable;
+ 			};
+ 
++			cam_mclk3_default: cam-mclk3-default-state {
++				pins = "gpio86";
++				function = "cam_mclk";
++				drive-strength = <4>;
++				bias-disable;
++			};
++
++			cam_mclk3_sleep: cam-mclk3-sleep-state {
++				pins = "gpio86";
++				function = "cam_mclk";
++				drive-strength = <2>;
++				bias-pull-down;
++			};
++
++			s5kkd1sp_reset_default: s5kkd1sp-reset-default-state {
++				pins = "gpio43";
++				function = "gpio";
++				drive-strength = <2>;
++				bias-disable;
++			};
++
+ 			cci0_0_default: cci0-0-default-state {
+ 				sda-pins {
+ 					pins = "gpio88";
+-- 
+2.56.0
+
