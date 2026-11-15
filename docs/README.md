@@ -32,3 +32,34 @@ partitions, partition dumps and captured photos.
 | `front-capture.sh` | phone | Route the front sensor through CAMSS and capture raw frames |
 | `raw2jpg.py` | host | Quick-look conversion of packed RAW10 Bayer to JPEG |
 | `libcamera-build-apk.sh` | aarch64 Alpine container | Build the libcamera aport with abuild |
+
+## Kernel development on macOS (Apple Silicon)
+
+The kernel is built in a native arm64 Alpine container (`dev/Dockerfile`,
+driven by `dev.sh`); the phone is driven from macOS, since Docker Desktop
+cannot pass USB through. Host needs: Docker Desktop, `brew install
+android-platform-tools` (fastboot), ssh. The kernel tree and build output live
+in the Docker volumes `fp6-milos-linux` and `fp6-kbuild` (case-sensitive);
+results land in `out/` (git-ignored).
+
+```sh
+./dev.sh image     # once: build the fp6-dev container image
+./dev.sh src       # pinned KERNEL_COMMIT + the aport's 000*.patch as commits
+./dev.sh kbuild    # Image.gz, dtbs, modules -> out/ (camss, s5kkd1, dtb)
+./dev.sh shell     # hack in /work/milos-linux, commit, then:
+./dev.sh patches   # export the commits back to the aport's 000*.patch
+./dev.sh bootimg out/boot.img   # released boot.img + out/ dtb -> out/test-boot.img
+```
+
+The same `dev.sh` works on a Linux host (Docker or Podman): on x86_64 the
+container cross-compiles with clang, which needs no extra toolchain. The
+volumes are per machine, so kernel work moves between machines only as
+commits in this repository: `./dev.sh patches`, commit, pull on the other
+machine, `./dev.sh src`. On Linux the phone can also be driven from the host
+the same way, with `ip`/`nmcli` for the USB network (see `install.sh`).
+
+The phone's USB network (172.16.42.1) comes up on macOS as a CDC-NCM
+interface and normally gets 172.16.42.2 by DHCP. `install.sh` and
+`tools/cycle.sh` fall back to `gtimeout` or perl where macOS has no
+`timeout`. Only ever `fastboot boot` test images; `fastboot flash boot` wipes
+the modem NV on this phone.

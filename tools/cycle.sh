@@ -5,6 +5,11 @@
 cd "$(dirname "$0")"
 IMG=${1:-test-s5kkd1.img}
 P=user@172.16.42.1
+# macOS has no timeout(1): gtimeout (brew coreutils) or a perl alarm instead
+command -v timeout >/dev/null 2>&1 || timeout() {
+	if command -v gtimeout >/dev/null 2>&1; then gtimeout "$@"
+	else local t=$1; shift; perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$t" "$@"; fi
+}
 ssh -o BatchMode=yes -o ConnectTimeout=8 $P 'sync; sudo systemctl reboot --reboot-argument=bootloader' 2>/dev/null
 for i in $(seq 1 40); do sleep 3; D=$(fastboot devices 2>/dev/null || true); [ -n "$D" ] && break; done
 [ -n "$D" ] || { echo "no fastboot device"; exit 1; }

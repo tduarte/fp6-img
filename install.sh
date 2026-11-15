@@ -39,6 +39,12 @@ command -v ssh >/dev/null || die "ssh not found"
 # quitting mid-output SIGPIPEs fastboot to death mid-transaction and leaves
 # the bootloader's fastboot state machine wedged - the NEXT command then
 # hangs. Capture completely, test afterwards.
+# macOS has no timeout(1): use coreutils' gtimeout if installed, else perl
+# (always present on macOS), whose alarm survives the exec and kills fastboot.
+command -v timeout >/dev/null 2>&1 || timeout() {
+	if command -v gtimeout >/dev/null 2>&1; then gtimeout "$@"
+	else _t=$1; shift; perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$_t" "$@"; fi
+}
 DEVICES=$(fastboot devices 2>/dev/null || true)
 printf '%s' "$DEVICES" | grep -q fastboot || \
 	die "no device in fastboot mode (Vol-down + Power, USB connected)"
