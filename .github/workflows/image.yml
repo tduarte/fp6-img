@@ -14,7 +14,7 @@ name: image
 on:
   workflow_dispatch:
   push:
-    branches: [main, claude/gh-actions-image-d9be47]  # TEMP: bring-up branch
+    branches: [main]
 
 concurrency:
   group: image-${{ github.ref }}
@@ -29,8 +29,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # The runner image ships ~14 GB free; the pmbootstrap work dir (kernel
-      # build tree, chroots, 3 GiB rootfs image, export, archive) needs more.
+      # ubuntu-24.04-arm has ~34 GB free on / (72 GB disk). The build peaks at
+      # ~10 GB (pmbootstrap work dir 7.1 GB, fp6img-work 2.5 GB, 660 MiB
+      # archive), so this is headroom, not a requirement; it takes ~1 min and
+      # lifts free space to ~56 GB.
       - name: Free disk space
         run: |
           df -h / /mnt 2>/dev/null || df -h /
