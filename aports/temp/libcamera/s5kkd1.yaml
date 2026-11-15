@@ -1,12 +1,27 @@
-# SPDX-License-Identifier: CC0-1.0
-#
 # libcamera softISP tuning for the Fairphone 6 front camera (Samsung S5KKD1).
 #
-# First cut, not calibrated: black level is the sensor's 10-bit pedestal of
-# 64 (raw frames bottom out at 61..64), i.e. 4096 on the 16-bit scale.
-# AWB is plain grey world and there is no CCM yet - the stock FP6 tuning data
-# for this sensor (vendor partition) has not been decoded. No Af: the
-# AW86016 actuator has no driver.
+# Colour data from the FP6 stock Android tuning blob
+# com.qti.tuned.tsp_s5kkd1_fp6.bin (vendor_a, sha256 7770f9fd...1f9db10f),
+# read with tools/tuned_colour.py the same way as imx896.yaml:
+#
+# - Ccm: the cc13 BRIGHT zone (lux-index trigger 1-200, tree at 0x10d1d9),
+#   four CCT regions: <2500, 2700-3400, 3700-4300, 4800-10000 K. Rows sum to
+#   1.0, offsets all zero. Nodes: 2300 (the locus point inside the open-ended
+#   low region), 3050 and 4000 (region midpoints), 6500 (D65; the region runs
+#   to 10000 K, whose midpoint would sit far from daylight). The three dimmer
+#   zones carry the same regions at lower saturation.
+# - Awb colourGains: the AWB reference points at 0x8638a, (R, B) gains, with
+#   the same structure and order as the IMX896 blob's (labels as in
+#   imx896.yaml); the three fluorescent points are left off the locus, and
+#   clampMargin 0.35 admits them.
+# - Black level: the sensor's 10-bit pedestal of 64 (raw frames bottom out at
+#   61..64), 4096 on the 16-bit scale.
+# - No Af: the AW86016 actuator has no driver.
+#
+# PROVENANCE / LICENSE: as imx896.yaml - numeric calibration data read out
+# of the proprietary vendor blob (measured spectral response of this sensor,
+# not authored expression), shipped on the same basis; NOT marked CC0.
+# Durable replacement: measure our own from a colour chart.
 %YAML 1.1
 ---
 version: 1
@@ -14,6 +29,35 @@ algorithms:
   - BlackLevel:
       blackLevel: 4096
   - Awb:
+      algorithm: grey
+      colourGains:
+        - { ct: 1900, gains: [ 0.745046, 2.473206 ] }
+        - { ct: 2300, gains: [ 0.906047, 2.252876 ] }
+        - { ct: 2856, gains: [ 1.064142, 2.122857 ] }
+        - { ct: 5000, gains: [ 1.481143, 1.564945 ] }
+        - { ct: 6504, gains: [ 1.633385, 1.442483 ] }
+        - { ct: 7504, gains: [ 1.708421, 1.334870 ] }
+        - { ct: 9500, gains: [ 2.521756, 1.096632 ] }
+      clampMargin: 0.35
+      zoneGating: true
+  - Ccm:
+      ccms:
+        - ct: 2300
+          ccm: [ 2.089260, -1.126494,  0.037234,
+                -0.186268,  1.189732, -0.003464,
+                -0.224810, -0.998645,  2.223455 ]
+        - ct: 3050
+          ccm: [ 1.960756, -0.971115,  0.010359,
+                -0.248089,  1.302973, -0.054884,
+                -0.208317, -0.826650,  2.034967 ]
+        - ct: 4000
+          ccm: [ 2.245903, -1.268993,  0.023090,
+                -0.236168,  1.336483, -0.100315,
+                -0.145235, -0.745029,  1.890264 ]
+        - ct: 6500
+          ccm: [ 2.118045, -0.912831, -0.205214,
+                -0.287119,  1.623994, -0.336875,
+                -0.096991, -0.770955,  1.867946 ]
   - Adjust:
   - Agc:
 ...

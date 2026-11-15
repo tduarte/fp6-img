@@ -30,6 +30,7 @@ partitions, partition dumps and captured photos.
 | `mk-test-bootimg.sh` | host | Stock kernel + ramdisk with a new DTB, for `fastboot boot` |
 | `cycle.sh` | host | Reboot to bootloader, RAM-boot, swap in test modules |
 | `front-capture.sh` | phone | Route the front sensor through CAMSS and capture raw frames |
+| `tuned_colour.py` | host | Find CCMs and the AWB reference table in a CamX `com.qti.tuned.*.bin` |
 | `raw2jpg.py` | host | Quick-look conversion of packed RAW10 Bayer to JPEG |
 | `libcamera-build-apk.sh` | aarch64 Alpine container | Build the libcamera aport with abuild |
 

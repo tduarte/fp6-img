@@ -150,3 +150,21 @@ Approach changed from the maintainer's CCS route to a dedicated driver.
   front camera; rotation 270 comes from the DT.
 - Left: CCM from the stock tuning data, sensor delays, AW86016 AF driver,
   and the image build carrying the kernel patches.
+
+## Front camera colour from the stock tuning (2026-11-14, night)
+
+- Stock vendor_a sits in `super` (logical partition, one extent at
+  5265948672, 1629237248 bytes); mounted read-only on the phone through a
+  read-only loop device to copy `com.qti.tuned.tsp_s5kkd1_fp6.bin`
+  (sha256 7770f9fd...1f9db10f). Vendor files stay out of the repository.
+- `tools/tuned_colour.py` finds CCMs (rows summing to 1) and the AWB
+  reference table in a CamX blob; checked against the IMX896 blob, where it
+  reproduces the 12 matrices and the locus imx896.yaml was made from.
+- S5KKD1 cc13: 4 lux zones (1-200, 230-330, 370-450, 480-999) x 4 CCT
+  regions (<2500, 2700-3400, 3700/3800-4300, 4800-10000 K). `s5kkd1.yaml`
+  (libcamera r104) carries the bright zone (nodes 2300/3050/4000/6500 K) and
+  the 7-point AWB locus (0x8638a), same conventions as imx896.yaml.
+- Verified: the GPU debayer receives the interpolated CCM (identity before);
+  mean saturation 58.6 -> 120.1 on the same scene. Only tested in a dark
+  room, where the bright-zone matrices also raise chroma noise; check in
+  daylight.

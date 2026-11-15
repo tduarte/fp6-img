@@ -5,7 +5,7 @@ _pkgver=0.8.0
 pkgver=9999$_pkgver
 # always sorts above the pmaports aport (r0..r99) at the same pkgver; the
 # 0.7.2 fork was shadowed by pmaports' 99990.8.0 and never got installed
-pkgrel=103
+pkgrel=104
 pkgdesc="Linux camera framework"
 url="https://libcamera.org/"
 arch="all"

@@ -8,7 +8,7 @@ driver and device are up; it does not mean a full functional test was done.
 |---|---|---|
 | Main camera (IMX896) | Works with patched libcamera r100 | sensor helper, tuning, autofocus confirmed with `cam`; stock libcamera gives near-black frames |
 | Ultra-wide (OV13B10) | Present, untested after patch | no `ov13b10.yaml`, falls back to uncalibrated tuning |
-| Front camera (S5KKD1SP) | Works with test kernel + libcamera r103 | s5kkd1 driver (kernel patch queue), RAM-booted; libcamera helper/properties/tuning: AE works, 30 fps via softISP, listed by PipeWire, works in Snapshot; no CCM, no AF driver (AW86016); not yet in a flashed image |
+| Front camera (S5KKD1SP) | Works with test kernel + libcamera r103 | s5kkd1 driver (kernel patch queue), RAM-booted; libcamera helper/properties/tuning: AE works, 30 fps via softISP, listed by PipeWire, works in Snapshot; stock CCM + AWB locus (r104); no AF driver (AW86016); not yet in a flashed image |
 | ToF ranger (VL53L3) | Not working | DT node present, no driver bound |
 | Camera flash LED | Present | `white:flash` LED registered; not exposed by libcamera |
 | GPU zero-copy for camera | Not working | "Importing input DMABuf failed, falling back to upload" |
@@ -34,7 +34,7 @@ driver and device are up; it does not mean a full functional test was done.
 
 ## Candidates for follow-up work, roughly by value
 
-1. Front camera: ship the kernel patches in an image; colour calibration (CCM) from the stock tuning data; sensor delays; AW86016 autofocus.
+1. Front camera: ship the kernel patches in an image; sensor delays; AW86016 autofocus.
 2. Ultra-wide tuning file (`ov13b10.yaml`) and a Snapshot check of both rear cameras.
 3. Touchscreen SPI/GPI timeouts (kernel, intermittent input loss).
 4. Proximity sensor I2C NAKs.
