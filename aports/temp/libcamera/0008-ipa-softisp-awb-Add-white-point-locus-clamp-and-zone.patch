@@ -1,0 +1,502 @@
+From bef40e1996051b34351bec7f8f717f72bd80f727 Mon Sep 17 00:00:00 2001
+From: Thiago Duarte <me@tduarte.co>
+Date: Sat, 14 Nov 2026 18:07:29 -0800
+Subject: [PATCH] ipa: softisp: awb: Add white point locus clamp and zone
+ gating
+
+Port of the fp6-img libcamera 0.7.2 AWB patches to the 0.8.0 softisp IPA,
+where AWB moved to libipa:
+
+  ipa: simple: awb: Add optional white point locus clamp and damping
+  ipa: simple: awb: Gate the gray-world estimate on near-neutral zones
+  (Jorijn van der Graaf)
+
+The locus and the per-zone statistics are as in the originals. What is
+different: the locus is read from libipa's existing colourGains key (the
+feature is enabled by the presence of clampMargin), the clamped target is
+handed to libipa's grey-world implementation as synthetic means so its
+smoothing and controls keep working, and the damping / fast-converge logic
+is dropped in favour of libipa's own smoothing. Zone sums follow 0.8.0's
+statistics and leave saturated pixels out.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+---
+ .../internal/software_isp/swisp_stats.h       |  28 ++
+ src/ipa/softisp/algorithms/awb.cpp            | 239 +++++++++++++++++-
+ src/ipa/softisp/algorithms/awb.h              |  27 ++
+ src/libcamera/software_isp/swstats_cpu.cpp    |  46 +++-
+ 4 files changed, 338 insertions(+), 2 deletions(-)
+
+diff --git a/include/libcamera/internal/software_isp/swisp_stats.h b/include/libcamera/internal/software_isp/swisp_stats.h
+index fcb26014..ff322548 100644
+--- a/include/libcamera/internal/software_isp/swisp_stats.h
++++ b/include/libcamera/internal/software_isp/swisp_stats.h
+@@ -60,6 +60,34 @@ struct SwIspStats {
+ 	 * \brief Contrast metric of the centre of the image, for autofocus
+ 	 */
+ 	uint64_t sharpness;
++	/**
++	 * \brief Number of AWB statistics zone columns
++	 */
++	static constexpr unsigned int kAwbZoneCols = 16;
++	/**
++	 * \brief Number of AWB statistics zone rows
++	 */
++	static constexpr unsigned int kAwbZoneRows = 12;
++	/**
++	 * \brief Per-zone colour channel sums and sample count
++	 *
++	 * The sums are in the same scale as sum_ and, like sum_, only cover
++	 * the unsaturated pixels. uint32_t is large enough: a zone of a 12-bit
++	 * 8192x6144 frame at the stats sampling density sums to at most ~2^26.
++	 */
++	struct AwbZone {
++		uint32_t sumR;
++		uint32_t sumG;
++		uint32_t sumB;
++		uint32_t count;
++	};
++	/**
++	 * \brief Colour channel sums of the sampled pixels per image zone
++	 *
++	 * The statistics window is divided into kAwbZoneCols x kAwbZoneRows
++	 * equally sized zones, stored in row-major order.
++	 */
++	std::array<AwbZone, kAwbZoneCols * kAwbZoneRows> awbZones;
+ };
+ 
+ } /* namespace libcamera */
+diff --git a/src/ipa/softisp/algorithms/awb.cpp b/src/ipa/softisp/algorithms/awb.cpp
+index fb9bcb06..ff80c1f2 100644
+--- a/src/ipa/softisp/algorithms/awb.cpp
++++ b/src/ipa/softisp/algorithms/awb.cpp
+@@ -7,6 +7,10 @@
+ 
+ #include "awb.h"
+ 
++#include <algorithm>
++#include <cmath>
++#include <limits>
++#include <optional>
+ #include <stdint.h>
+ 
+ #include <libcamera/base/log.h>
+@@ -24,6 +28,20 @@ namespace ipa::softisp::algorithms {
+  */
+ static constexpr unsigned int kDefaultLux = 500;
+ 
++/*
++ * Zone gating thresholds. A zone votes only when it carries enough samples
++ * to trust its means (kZoneMinSamples) and the green mean clears the black
++ * level by at least kZoneMinSignal (saturated pixels are already left out of
++ * the zone sums). The implied per-zone gains are capped at kZoneMaxGain to
++ * keep the locus distance finite for almost-black channels. Fewer than
++ * kZoneMinIncluded voting zones means the scene carries no usable spatial
++ * signal and the whole-frame estimate is used instead.
++ */
++static constexpr unsigned int kZoneMinSamples = 16;
++static constexpr double kZoneMinSignal = 2.0;
++static constexpr double kZoneMaxGain = 8.0;
++static constexpr unsigned int kZoneMinIncluded = 4;
++
+ class SoftIspAwbStats final : public AwbStats
+ {
+ public:
+@@ -73,9 +91,180 @@ private:
+ /**
+  * \copydoc libcamera::ipa::Algorithm::init
+  */
++/*
++ * Optional per-sensor tuning, on top of the libipa Awb keys:
++ *
++ * - Awb:
++ *     colourGains:            # ordered by strictly ascending ct
++ *       - { ct: 2856, gains: [ 1.378, 2.769 ] }   # [ R gain, B gain ]
++ *       - { ct: 5000, gains: [ 2.037, 1.809 ] }
++ *     clampMargin: 0.35       # max distance from the locus in gain space
++ *     zoneGating: true        # vote with near-neutral zones only
++ *     zoneGateMargin: 0.35    # max locus distance for a zone to vote
++ *
++ * When clampMargin is present, colourGains is also used as a piecewise-linear
++ * locus of calibrated illuminant white points in (R gain, B gain) space. The
++ * grey-world estimate is clamped to within clampMargin of the locus, bounding
++ * how far scene colours can pull the white balance while still allowing
++ * off-locus (greenish, e.g. fluorescent) illuminants, and the colour
++ * temperature fed to the Ccm algorithm is interpolated from the applied gains'
++ * position along the locus instead of being estimated from the raw means.
++ *
++ * With zoneGating the grey-world sums are taken from the statistics zones
++ * whose implied gains lie within zoneGateMargin (default clampMargin) of the
++ * locus, i.e. zones some plausible illuminant could render grey, so a large
++ * coloured area no longer drags the white balance. When too few zones qualify
++ * the whole-frame sums are used.
++ *
++ * Without clampMargin the libipa algorithm runs unchanged.
++ */
+ int Awb::init(IPAContext &context, const ValueNode &tuningData)
+ {
+-	return awbAlgo_.init(tuningData, context.ctrlMap);
++	int ret = awbAlgo_.init(tuningData, context.ctrlMap);
++	if (ret)
++		return ret;
++
++	if (!tuningData.contains("clampMargin"))
++		return 0;
++
++	const ValueNode &wps = tuningData["colourGains"];
++	if (!wps.isList() || wps.size() < 2) {
++		LOG(IPASoftIspAwb, Error)
++			<< "clampMargin needs colourGains with at least two points";
++		return -EINVAL;
++	}
++
++	for (const ValueNode &node : wps.asList()) {
++		std::optional<double> ct = node["ct"].get<double>();
++		std::optional<std::vector<double>> gains =
++			node["gains"].get<std::vector<double>>();
++		if (!ct || !gains || gains->size() != 2 ||
++		    (*gains)[0] <= 0.0 || (*gains)[1] <= 0.0) {
++			LOG(IPASoftIspAwb, Error)
++				<< "colourGains entries need a ct and positive gains [ R, B ]";
++			whitePoints_.clear();
++			return -EINVAL;
++		}
++		if (!whitePoints_.empty()) {
++			const WhitePoint &prev = whitePoints_.back();
++			if (*ct <= prev.ct ||
++			    ((*gains)[0] == prev.rGain && (*gains)[1] == prev.bGain)) {
++				LOG(IPASoftIspAwb, Error)
++					<< "colourGains must be ordered by strictly ascending ct "
++					<< "and consecutive points must differ in gains";
++				whitePoints_.clear();
++				return -EINVAL;
++			}
++		}
++		whitePoints_.push_back({ *ct, (*gains)[0], (*gains)[1] });
++	}
++
++	clampMargin_ = tuningData["clampMargin"].get<double>(0.35);
++	zoneGating_ = tuningData["zoneGating"].get<bool>(true);
++	zoneGateMargin_ = tuningData["zoneGateMargin"].get<double>(clampMargin_);
++	if (clampMargin_ <= 0.0 || zoneGateMargin_ <= 0.0) {
++		LOG(IPASoftIspAwb, Error)
++			<< "clampMargin and zoneGateMargin must be positive";
++		whitePoints_.clear();
++		return -EINVAL;
++	}
++
++	LOG(IPASoftIspAwb, Info)
++		<< "White point locus: " << whitePoints_.size() << " points, "
++		<< whitePoints_.front().ct << "-" << whitePoints_.back().ct
++		<< " K, clamp margin " << clampMargin_
++		<< ", zone gating " << (zoneGating_ ? "on" : "off")
++		<< " margin " << zoneGateMargin_;
++
++	return 0;
++}
++
++/*
++ * Find the closest point on the piecewise-linear white point locus, and
++ * the colour temperature interpolated along the containing segment.
++ */
++Awb::LocusPosition Awb::closestOnLocus(double rGain, double bGain) const
++{
++	LocusPosition best{};
++	double bestDist2 = std::numeric_limits<double>::max();
++
++	for (unsigned int i = 0; i + 1 < whitePoints_.size(); i++) {
++		const WhitePoint &p0 = whitePoints_[i];
++		const WhitePoint &p1 = whitePoints_[i + 1];
++		const double dr = p1.rGain - p0.rGain;
++		const double db = p1.bGain - p0.bGain;
++		const double len2 = dr * dr + db * db;
++		double t = ((rGain - p0.rGain) * dr + (bGain - p0.bGain) * db) / len2;
++		t = std::clamp(t, 0.0, 1.0);
++		const double qr = p0.rGain + t * dr;
++		const double qb = p0.bGain + t * db;
++		const double dist2 = (rGain - qr) * (rGain - qr) +
++				     (bGain - qb) * (bGain - qb);
++		if (dist2 < bestDist2) {
++			bestDist2 = dist2;
++			best.rGain = qr;
++			best.bGain = qb;
++			best.ct = p0.ct + t * (p1.ct - p0.ct);
++		}
++	}
++
++	best.distance = std::sqrt(bestDist2);
++	return best;
++}
++
++/*
++ * Compute the grey-world gains from the near-neutral image zones only.
++ *
++ * A large coloured area defeats whole-frame averaging by design: the frame
++ * average it produces is statistically identical to that of a neutral scene
++ * under some other illuminant. Per zone the distinction is visible: a zone
++ * votes only when the gains that would render it grey lie close to the
++ * calibrated white point locus. Zones that are too dark or strongly coloured
++ * are excluded. Returns false when too few zones vote; the caller then falls
++ * back to the whole-frame estimate.
++ */
++bool Awb::gatedEstimate(const SwIspStats &stats, double blackLevel,
++			double &rTarget, double &bTarget) const
++{
++	double sumR = 0.0, sumG = 0.0, sumB = 0.0;
++	unsigned int eligible = 0, included = 0;
++
++	for (const SwIspStats::AwbZone &zone : stats.awbZones) {
++		if (zone.count < kZoneMinSamples)
++			continue;
++
++		const double r = static_cast<double>(zone.sumR) / zone.count - blackLevel;
++		const double g = static_cast<double>(zone.sumG) / zone.count - blackLevel;
++		const double b = static_cast<double>(zone.sumB) / zone.count - blackLevel;
++		if (g < kZoneMinSignal)
++			continue;
++
++		eligible++;
++
++		const double gR = g / std::max(r, g / kZoneMaxGain);
++		const double gB = g / std::max(b, g / kZoneMaxGain);
++		if (closestOnLocus(gR, gB).distance > zoneGateMargin_)
++			continue;
++
++		included++;
++		sumR += r * zone.count;
++		sumG += g * zone.count;
++		sumB += b * zone.count;
++	}
++
++	if (included < kZoneMinIncluded || sumR <= 0.0 || sumB <= 0.0) {
++		LOG(IPASoftIspAwb, Debug)
++			<< "zone gate: " << included << "/" << eligible
++			<< " zones, falling back to whole-frame";
++		return false;
++	}
++
++	LOG(IPASoftIspAwb, Debug)
++		<< "zone gate: " << included << "/" << eligible << " zones vote";
++
++	rTarget = sumG / sumR;
++	bTarget = sumG / sumB;
++	return true;
+ }
+ 
+ /**
+@@ -159,8 +348,56 @@ void Awb::process(IPAContext &context, [[maybe_unused]] const uint32_t frame,
+ {
+ 	SoftIspAwbStats awbStats = calculateRgbMeans(context, stats);
+ 
++	if (!whitePoints_.empty() && awbStats.valid()) {
++		const RGB<double> means = awbStats.rgbMeans();
++
++		/*
++		 * Grey-world estimate, from the near-neutral zones when enough
++		 * of them pass the chromaticity gate, from the whole-frame
++		 * means otherwise.
++		 */
++		double rTarget, bTarget;
++		if (!zoneGating_ ||
++		    !gatedEstimate(*stats, context.activeState.blc.level,
++				   rTarget, bTarget)) {
++			rTarget = means.g() / std::max(means.r(), 0.001);
++			bTarget = means.g() / std::max(means.b(), 0.001);
++		}
++
++		/* Clamp the estimate to within clampMargin_ of the locus. */
++		const LocusPosition projection = closestOnLocus(rTarget, bTarget);
++		if (projection.distance > clampMargin_) {
++			const double f = clampMargin_ / projection.distance;
++			rTarget = projection.rGain + (rTarget - projection.rGain) * f;
++			bTarget = projection.bGain + (bTarget - projection.bGain) * f;
++		}
++
++		LOG(IPASoftIspAwb, Debug)
++			<< "target gains R/B: " << rTarget << "/" << bTarget
++			<< "; locus distance: " << projection.distance;
++
++		/*
++		 * Hand the libipa grey-world algorithm means that yield exactly
++		 * the clamped gains, so its smoothing and controls keep working.
++		 */
++		const double g = std::max(means.g(), 0.001);
++		awbStats = SoftIspAwbStats({ { g / rTarget, g, g / bTarget } });
++	}
++
+ 	awbAlgo_.process(context.activeState.awb, frameContext.awb, awbStats,
+ 			 kDefaultLux, metadata);
++
++	if (!whitePoints_.empty() && awbStats.valid()) {
++		/*
++		 * The colour temperature the Ccm algorithm consumes follows
++		 * from where the applied gains sit along the locus, so the
++		 * matrix always matches the applied white balance.
++		 */
++		auto &automatic = context.activeState.awb.automatic;
++		automatic.colourTemperature = static_cast<unsigned int>(
++			std::lround(closestOnLocus(automatic.gains.r(),
++						   automatic.gains.b()).ct));
++	}
+ }
+ 
+ REGISTER_IPA_ALGORITHM(Awb, "Awb")
+diff --git a/src/ipa/softisp/algorithms/awb.h b/src/ipa/softisp/algorithms/awb.h
+index c92bdbfd..10c55f0f 100644
+--- a/src/ipa/softisp/algorithms/awb.h
++++ b/src/ipa/softisp/algorithms/awb.h
+@@ -7,6 +7,8 @@
+ 
+ #pragma once
+ 
++#include <vector>
++
+ #include <libcamera/controls.h>
+ 
+ #include "libcamera/internal/software_isp/debayer_params.h"
+@@ -48,8 +50,33 @@ public:
+ 		     ControlList &metadata) override;
+ 
+ private:
++	struct WhitePoint {
++		double ct;
++		double rGain;
++		double bGain;
++	};
++
++	struct LocusPosition {
++		double rGain;
++		double bGain;
++		double ct;
++		double distance;
++	};
++
+ 	SoftIspAwbStats calculateRgbMeans(IPAContext &context,
+ 					  const SwIspStats *stats) const;
++	LocusPosition closestOnLocus(double rGain, double bGain) const;
++	bool gatedEstimate(const SwIspStats &stats, double blackLevel,
++			   double &rTarget, double &bTarget) const;
++
++	/*
++	 * Calibrated white point locus in (R gain, B gain) space, ordered by
++	 * ascending colour temperature. Empty when the locus clamp is off.
++	 */
++	std::vector<WhitePoint> whitePoints_;
++	double clampMargin_ = 0.0;
++	bool zoneGating_ = false;
++	double zoneGateMargin_ = 0.0;
+ 
+ 	/*
+ 	 * There actually is no Q register format for SoftISP, but allow the
+diff --git a/src/libcamera/software_isp/swstats_cpu.cpp b/src/libcamera/software_isp/swstats_cpu.cpp
+index 0d3adebe..46113835 100644
+--- a/src/libcamera/software_isp/swstats_cpu.cpp
++++ b/src/libcamera/software_isp/swstats_cpu.cpp
+@@ -11,6 +11,8 @@
+ 
+ #include "libcamera/internal/software_isp/swstats_cpu.h"
+ 
++#include <algorithm>
++
+ #include <libcamera/base/log.h>
+ 
+ #include <libcamera/stream.h>
+@@ -202,7 +204,19 @@ static constexpr unsigned int kBlueYMul = 29; /* 0.114 * 256 */
+ 	const unsigned int sharpXBegin = (lineLength) * 2 / 5;              \
+ 	const unsigned int sharpXEnd = (lineLength) * 3 / 5;                \
+ 	const bool sharpRow = y >= window_.height * 2 / 5 &&                \
+-			      y < window_.height * 3 / 5;
++			      y < window_.height * 3 / 5;                   \
++	uint32_t zSumR = 0;               \
++	uint32_t zSumG = 0;               \
++	uint32_t zSumB = 0;               \
++	uint32_t zCount = 0;              \
++	unsigned int zCol = 0;            \
++	const unsigned int zLineLength = (lineLength);                      \
++	unsigned int zEndX = zLineLength / SwIspStats::kAwbZoneCols;        \
++	SwIspStats::AwbZone *zRow = &stats.awbZones[                        \
++		std::min(y * SwIspStats::kAwbZoneRows /                     \
++				 static_cast<unsigned int>(window_.height), \
++			 SwIspStats::kAwbZoneRows - 1) *                    \
++		SwIspStats::kAwbZoneCols];
+ 
+ /*
+  * Sharpness is the sum of the squared differences between green samples two
+@@ -211,6 +225,15 @@ static constexpr unsigned int kBlueYMul = 29; /* 0.114 * 256 */
+  * updated for every sample so that the window always has valid history.
+  */
+ #define SWSTATS_ACCUMULATE_LINE_STATS(div)      \
++	while (x >= zEndX && zCol + 1 < SwIspStats::kAwbZoneCols) { \
++		zRow[zCol].sumR += zSumR;       \
++		zRow[zCol].sumG += zSumG;       \
++		zRow[zCol].sumB += zSumB;       \
++		zRow[zCol].count += zCount;     \
++		zSumR = zSumG = zSumB = zCount = 0; \
++		zCol++;                         \
++		zEndX = (zCol + 1) * zLineLength / SwIspStats::kAwbZoneCols; \
++	}                                       \
+ 	if (r < kSaturationThreshold * (div) && \
+ 	    g < kSaturationThreshold * (div) && \
+ 	    b < kSaturationThreshold * (div)) { \
+@@ -218,6 +241,10 @@ static constexpr unsigned int kBlueYMul = 29; /* 0.114 * 256 */
+ 		sumG += g;                      \
+ 		sumB += b;                      \
+ 		nSamples++;                     \
++		zSumR += r;                     \
++		zSumG += g;                     \
++		zSumB += b;                     \
++		zCount++;                       \
+ 	}                                       \
+                                                 \
+ 	yVal = r * kRedYMul;                    \
+@@ -244,6 +271,10 @@ static constexpr unsigned int kBlueYMul = 29; /* 0.114 * 256 */
+ 	stats.sum_.g() += sumG;     \
+ 	stats.sum_.b() += sumB;     \
+ 	stats.numPixels_ += nSamples; \
++	zRow[zCol].sumR += zSumR;   \
++	zRow[zCol].sumG += zSumG;   \
++	zRow[zCol].sumB += zSumB;   \
++	zRow[zCol].count += zCount; \
+ 	if (sharpCount) {           \
+ 		const uint64_t meanG = sharpSumG / sharpCount; \
+ 		if (meanG)          \
+@@ -477,6 +508,7 @@ void SwStatsCpu::startFrame(uint32_t frame)
+ 		s.sum_ = RGB<uint64_t>({ 0, 0, 0 });
+ 		s.numPixels_ = 0;
+ 		s.sharpness = 0;
++		s.awbZones.fill({ 0, 0, 0, 0 });
+ 		s.yHistogram.fill(0);
+ 	}
+ }
+@@ -496,16 +528,28 @@ void SwStatsCpu::finishFrame(uint32_t frame, uint32_t bufferId)
+ 		sharedStats_->sum_ = RGB<uint64_t>({ 0, 0, 0 });
+ 		sharedStats_->numPixels_ = 0;
+ 		sharedStats_->sharpness = 0;
++		sharedStats_->awbZones.fill({ 0, 0, 0, 0 });
+ 		sharedStats_->yHistogram.fill(0);
+ 		for (const auto &s : stats_) {
+ 			sharedStats_->sum_ += s.sum_;
+ 			sharedStats_->numPixels_ += s.numPixels_;
+ 			sharedStats_->sharpness += s.sharpness;
++			for (unsigned int j = 0; j < sharedStats_->awbZones.size(); j++) {
++				sharedStats_->awbZones[j].sumR += s.awbZones[j].sumR;
++				sharedStats_->awbZones[j].sumG += s.awbZones[j].sumG;
++				sharedStats_->awbZones[j].sumB += s.awbZones[j].sumB;
++				sharedStats_->awbZones[j].count += s.awbZones[j].count;
++			}
+ 			for (unsigned int j = 0; j < SwIspStats::kYHistogramSize; j++)
+ 				sharedStats_->yHistogram[j] += s.yHistogram[j];
+ 		}
+ 
+ 		sharedStats_->sum_ >>= sumShift_;
++		for (SwIspStats::AwbZone &zone : sharedStats_->awbZones) {
++			zone.sumR >>= sumShift_;
++			zone.sumG >>= sumShift_;
++			zone.sumB >>= sumShift_;
++		}
+ 	}
+ 
+ 	sharedStats_->valid = valid;
+-- 
+2.56.0
+

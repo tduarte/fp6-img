@@ -1,0 +1,50 @@
+From 1e41f34be7ea45dd0101f0b94f4b6715451cee98 Mon Sep 17 00:00:00 2001
+From: Thiago Duarte <me@tduarte.co>
+Date: Sat, 14 Nov 2026 18:25:47 -0800
+Subject: [PATCH] ipa: softisp: af: Wait longer after returning to the start of
+ a sweep
+
+A refocus on the FP6 main camera (DW9784) ended on "Best focus with step
+10: 0 (sharpness 99537)" right after the lens had been settled at 78 with a
+reference of 86018, and left the picture blurred. The first coarse sample
+is taken three stats frames after the lens is sent from its focused
+position back to 0, and statistics gathered at the old position can still
+be in flight. Skip eight stats frames for that one move.
+
+Not yet verified on the device.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+---
+ src/ipa/softisp/algorithms/af.cpp | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/ipa/softisp/algorithms/af.cpp b/src/ipa/softisp/algorithms/af.cpp
+index ff8364f0..76b0a74f 100644
+--- a/src/ipa/softisp/algorithms/af.cpp
++++ b/src/ipa/softisp/algorithms/af.cpp
+@@ -32,6 +32,13 @@ constexpr double kStepDivisor = 5.0;
+ constexpr double kFineStepMin = 1.0;
+ /* Stats frames to ignore after a large lens movement. */
+ constexpr uint32_t kSettleSkipLong = 3;
++/*
++ * Stats frames to ignore after the lens returns to the start of a sweep. This
++ * is the longest move there is, and the statistics still in the pipeline were
++ * gathered at the previous, focused position: sampled too early they win the
++ * coarse phase whenever nothing in the new scene is sharp.
++ */
++constexpr uint32_t kSettleSkipRestart = 8;
+ /* Relative sharpness change that makes a settled scene worth re-focusing. */
+ constexpr double kFocusLossThreshold = 0.3;
+ /* Consecutive stats frames that change must persist for before re-focusing. */
+@@ -142,7 +149,7 @@ void Af::restart(IPAContext &context)
+ 	focus.start = 0;
+ 	focus.stop = 100;
+ 	focus.step = kCoarseStep;
+-	focus.skip = kSettleSkipLong;
++	focus.skip = kSettleSkipRestart;
+ 	focus.settled = false;
+ 	focus.lossCount = 0;
+ 	context.activeState.knobs.focus_pos = 0;
+-- 
+2.56.0
+

@@ -1,17 +1,20 @@
+From d3d2cd30180791a846b1aca30f43a8b346ca7e78 Mon Sep 17 00:00:00 2001
 From: nondescriptpointer <public@nondescriptpointer.com>
 Date: Tue, 21 Jul 2026 00:00:00 +0000
-Subject: [PATCH] libcamera: sensor: Add OV13B10 sensor properties
+Subject: [PATCH 4/6] libcamera: sensor: Add OV13B10 sensor properties
 
 Adds the OV13B10 (Fairphone 6 ultra-wide) to the sensor properties
 database: 1.12um unit cell and its test-pattern mode mapping. Removes
 the "No static properties available for 'ov13b10'" warning.
 ---
- src/libcamera/sensor/camera_sensor_properties.cpp | 7 +++++++
- 1 file changed, 7 insertions(+)
+ src/libcamera/sensor/camera_sensor_properties.cpp | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
+diff --git a/src/libcamera/sensor/camera_sensor_properties.cpp b/src/libcamera/sensor/camera_sensor_properties.cpp
+index 20cfd0bc..af3fedab 100644
 --- a/src/libcamera/sensor/camera_sensor_properties.cpp
 +++ b/src/libcamera/sensor/camera_sensor_properties.cpp
-@@ -503,6 +503,14 @@
+@@ -571,6 +571,14 @@ const CameraSensorProperties *CameraSensorProperties::get(const std::string &sen
  			},
  			.sensorDelays = { },
  		} },
@@ -26,3 +29,6 @@ the "No static properties available for 'ov13b10'" warning.
  		{ "vd55g1", {
  			.unitCellSize = { 2160, 2160 },
  			.testPatternModes = {
+-- 
+2.56.0
+
